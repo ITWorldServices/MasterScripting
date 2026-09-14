@@ -234,7 +234,10 @@ $system = Invoke-Collector 'System' {
     $os=Get-CimInstance Win32_OperatingSystem
     $cpu=@(Get-CimInstance Win32_Processor)
     $bios=Get-CimInstance Win32_BIOS
-    $virtual=$cs.HypervisorPresent -or $cs.Model -match 'Virtual|VMware|KVM|HVM|VirtualBox'
+    $virtual=(
+        $cs.Manufacturer -match 'VMware|QEMU|Xen|innotek' -or
+        $cs.Model -match 'Virtual Machine|VirtualBox|KVM|HVM domU|VMware|Bochs|Xen'
+    )
     [pscustomobject][ordered]@{
         ComputerName=$cs.Name; Domain=$cs.Domain; Manufacturer=$cs.Manufacturer; Model=$cs.Model
         SerialNumber=$bios.SerialNumber; PhysicalOrVirtual=$(if($virtual){'Virtual'}else{'Physical'})
@@ -372,7 +375,7 @@ if($features.Name -contains 'AD-Domain-Services'){
             ComputerName=$ComputerName; FQDN=$d.HostName; Site=$d.Site; IPv4=$d.IPv4Address
             OperatingSystem=$d.OperatingSystem; GlobalCatalog=$d.IsGlobalCatalog; ReadOnly=$d.IsReadOnly
             DomainFQDN=$domain.DNSRoot; DomainShortName=$domain.NetBIOSName; UPNSuffixes=Join-Unique @($forest.UPNSuffixes)
-            DomainMode=$domain.DomainMode; ForestMode=$forest.ForestMode; PDC=$domain.PDCEmulator
+            DomainMode=[string]$domain.DomainMode; ForestMode=[string]$forest.ForestMode; PDC=$domain.PDCEmulator
             RIDMaster=$domain.RIDMaster; InfrastructureMaster=$domain.InfrastructureMaster
             SchemaMaster=$forest.SchemaMaster; NamingMaster=$forest.DomainNamingMaster
         }

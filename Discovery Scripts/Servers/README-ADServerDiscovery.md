@@ -7,10 +7,11 @@ objects from Active Directory and produces one consolidated workbook in
 
 ## Files to download
 
-Keep these two files together in the same directory:
+Keep these three files together in the same directory:
 
 - `Invoke-ADServerDiscovery.ps1` — AD enumeration, remoting, consolidation, and Excel output
 - `Get-ServerDiscoveryData.ps1` — data-only collector executed through PowerShell remoting
+- `Get-LegacyServerDiscoveryData.ps1` — WMI/DCOM fallback for Server 2003/2008
 
 The collector is sent by `Invoke-Command -FilePath`; it does not need to be
 copied to each remote server. Remote servers do not need ImportExcel and do not
@@ -21,6 +22,7 @@ connect to GitHub. Only the initiating server creates the workbook.
 - Windows PowerShell 5.1
 - ActiveDirectory PowerShell module on the initiating server
 - PowerShell remoting/WinRM allowed from the initiating server to targets
+- WMI/DCOM and RPC firewall access to legacy Server 2003/2008 targets
 - An account with permission to query AD and inventory each target
 - HTTPS access to PowerShell Gallery/NuGet on the initiating server if
   ImportExcel 7.8.10 is not already installed
@@ -87,6 +89,20 @@ General servers run role-specific collectors only when the role is installed:
 
 AD users and group memberships are de-duplicated in the consolidated workbook
 when multiple domain controllers return the same domain data.
+
+## Legacy Windows Servers
+
+If a Windows Server 2003 or 2008 target does not return a modern PowerShell
+payload, the orchestrator retries it over WMI/DCOM from the initiating server.
+The legacy path collects system, network, storage, server features,
+applications, services, shares, scheduled tasks, local accounts, local group
+membership, and service accounts where the operating system exposes them.
+
+Legacy collection is identified as `Legacy basic only` on `Server Summary`.
+Listening ports and expanded share/NTFS permissions are not reliably available
+through the legacy interfaces and are recorded as skipped or limited in
+`Diagnostics`. Role-specific AD, DHCP, and DNS discovery remains on the modern
+collector.
 
 ## Failures and unavailable servers
 
