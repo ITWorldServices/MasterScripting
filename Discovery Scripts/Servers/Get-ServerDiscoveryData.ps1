@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+#Requires -Version 4.0
 <#
 .SYNOPSIS
 Collects discovery data from the Windows Server where this script executes.
@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$script:Diagnostics=[System.Collections.Generic.List[object]]::new()
+$script:Diagnostics=New-Object 'System.Collections.Generic.List[object]'
 $ComputerName=$env:COMPUTERNAME
 
 function Add-DiscoveryDiagnostic {
@@ -78,7 +78,12 @@ $system=Invoke-DiscoveryCollector 'System' {
     $os=Get-CimInstance Win32_OperatingSystem
     $cpu=@(Get-CimInstance Win32_Processor)
     $bios=Get-CimInstance Win32_BIOS
-    $virtual=$cs.HypervisorPresent -or $cs.Model -match 'Virtual|VMware|KVM|HVM|VirtualBox'
+    # HypervisorPresent is also true on physical Hyper-V hosts. Classify from
+    # hardware vendor/model signatures so a Dell/HP host is not marked virtual.
+    $virtual=(
+        $cs.Manufacturer -match 'VMware|QEMU|Xen|innotek' -or
+        $cs.Model -match 'Virtual Machine|VirtualBox|KVM|HVM domU|VMware|Bochs|Xen'
+    )
     [pscustomobject][ordered]@{
         ComputerName=$cs.Name
         Domain=$cs.Domain
@@ -270,22 +275,55 @@ $scheduledTasks=Invoke-DiscoveryCollector 'Scheduled Tasks' {
 
 $localAccounts=Invoke-DiscoveryCollector 'Local Accounts' {
     if($rolesAndFeatures.Name -contains 'AD-Domain-Services'){return}
-    if(-not(Get-Command Get-LocalUser -ErrorAction SilentlyContinue)){
-        throw 'Get-LocalUser is unavailable.'
+    if(Get-Command Get-LocalUser -ErrorAction SilentlyContinue){
+        Get-LocalUser | Sort-Object Name | Select-Object @{n='ComputerName';e={$ComputerName}},Name,Enabled,Description,LastLogon,PasswordExpires
+        return
     }
-    Get-LocalUser | Sort-Object Name | Select-Object @{n='ComputerName';e={$ComputerName}},Name,Enabled,Description,LastLogon,PasswordExpires
+    Add-DiscoveryDiagnostic 'Local Accounts Compatibility' Warning 'Get-LocalUser is unavailable; using Win32_UserAccount.'
+    Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' | Sort-Object Name | ForEach-Object {
+        [pscustomobject][ordered]@{
+            ComputerName=$ComputerName
+            Name=$_.Name
+            Enabled=(-not $_.Disabled)
+            Description=$_.Description
+            LastLogon=$null
+            PasswordExpires=$_.PasswordExpires
+        }
+    }
 }
 
 $localGroupMembership=Invoke-DiscoveryCollector 'Local Group Membership' {
     if($rolesAndFeatures.Name -contains 'AD-Domain-Services'){return}
-    if(-not(Get-Command Get-LocalGroupMember -ErrorAction SilentlyContinue)){
-        throw 'Local group cmdlets are unavailable.'
+    if(Get-Command Get-LocalGroupMember -ErrorAction SilentlyContinue){
+        foreach($group in Get-LocalGroup){
+            try{
+                Get-LocalGroupMember $group.Name -ErrorAction Stop | Select-Object @{n='ComputerName';e={$ComputerName}},@{n='Group';e={$group.Name}},Name,ObjectClass,PrincipalSource
+            }catch{
+                Add-DiscoveryDiagnostic 'Local Group Membership' Warning ('{0}: {1}' -f $group.Name,$_.Exception.Message)
+            }
+        }
+        return
     }
-    foreach($group in Get-LocalGroup){
-        try{
-            Get-LocalGroupMember $group.Name -ErrorAction Stop | Select-Object @{n='ComputerName';e={$ComputerName}},@{n='Group';e={$group.Name}},Name,ObjectClass,PrincipalSource
-        }catch{
-            Add-DiscoveryDiagnostic 'Local Group Membership' Warning ('{0}: {1}' -f $group.Name,$_.Exception.Message)
+    Add-DiscoveryDiagnostic 'Local Group Membership Compatibility' Warning 'Local group cmdlets are unavailable; using the WinNT provider.'
+    $computer=[ADSI]('WinNT://{0},computer' -f $ComputerName)
+    foreach($group in @($computer.psbase.Children | Where-Object {$_.SchemaClassName -eq 'group'})){
+        $groupName=[string]$group.Name
+        foreach($member in @($group.psbase.Invoke('Members'))){
+            try{
+                $memberType=$member.GetType()
+                $memberName=$memberType.InvokeMember('Name','GetProperty',$null,$member,$null)
+                $memberClass=$memberType.InvokeMember('Class','GetProperty',$null,$member,$null)
+                $adsPath=$memberType.InvokeMember('AdsPath','GetProperty',$null,$member,$null)
+                [pscustomobject][ordered]@{
+                    ComputerName=$ComputerName
+                    Group=$groupName
+                    Name=$(if($adsPath){$adsPath -replace '^WinNT://','' -replace '/','\\'}else{$memberName})
+                    ObjectClass=$memberClass
+                    PrincipalSource='WinNT'
+                }
+            }catch{
+                Add-DiscoveryDiagnostic 'Local Group Membership' Warning ('{0}: {1}' -f $groupName,$_.Exception.Message)
+            }
         }
     }
 }
@@ -343,8 +381,8 @@ if($basicOnly){
                 DomainFQDN=$domain.DNSRoot
                 DomainShortName=$domain.NetBIOSName
                 UPNSuffixes=(Join-DiscoveryValue @($forest.UPNSuffixes))
-                DomainMode=$domain.DomainMode
-                ForestMode=$forest.ForestMode
+                DomainMode=[string]$domain.DomainMode
+                ForestMode=[string]$forest.ForestMode
                 PDC=$domain.PDCEmulator
                 RIDMaster=$domain.RIDMaster
                 InfrastructureMaster=$domain.InfrastructureMaster
