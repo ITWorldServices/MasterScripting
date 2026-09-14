@@ -1,0 +1,2 @@
+$hostname1=Get-CimInstance -ClassName Win32_ComputerSystem|select Name
+Get-ChildItem -Path 'C:\'-Include *.pst -File -Exclude 'C:\Windows\'-Recurse -ErrorAction SilentlyContinue |Select-Object Directory,Name,Length,@{N="HostName";E={$hostname1.name}} |Export-Csv -append "\\PDC\PST\JacksonPSTInquiry.csv" -force -notypeinfo

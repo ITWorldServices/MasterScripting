@@ -1,0 +1,8 @@
+"Path","Identity","AccessType","Rights","Inheritance"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","TONNANDBLANK\AVD Test Users","Allow","FullControl","True"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","TONNANDBLANK\icmadmin","Allow","FullControl","True"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","TONNANDBLANK\SC","Allow","FullControl","True"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","TONNANDBLANK\Domain Admins","Allow","FullControl","True"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","CREATOR OWNER","Allow","FullControl","True"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","BUILTIN\Administrators","Allow","FullControl","True"
+"Y:\ttbntfile1\shared\appsdata\groups\SC\Security","NT AUTHORITY\SYSTEM","Allow","FullControl","True"

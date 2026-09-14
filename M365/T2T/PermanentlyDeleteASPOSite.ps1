@@ -1,0 +1,1 @@
+﻿Remove-SPODeletedSite -Identity https://nelsonwesterberg.sharepoint.com/sites/DMSMoving

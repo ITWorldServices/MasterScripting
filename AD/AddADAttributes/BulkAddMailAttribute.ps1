@@ -1,0 +1,2 @@
+﻿# Import CSV with Mail Attributes and set Mail Attribute to SamAccounts in AD - NOTE - CSV Header Definitions Must Match References Below For Data Desired To Be Added
+Import-Csv "PATH TO CSV FILE" | foreach {Set-ADUser -Identity $_.SamAccountName -Add @{Mail=$_.Mail}}

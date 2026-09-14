@@ -1,0 +1,7 @@
+ComputerShareSpaceInUseReport.ps1
+
+#Calculate the disk space used by each share on a server
+# This is a short powershell script that will collect the names of the shares on a computer
+# Remove the default share names. And then calculate the storage used by the remaining share names.
+#  *** Depending on the size of the share this could take a very long time!!!
+

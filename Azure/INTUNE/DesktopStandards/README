@@ -1,0 +1,8 @@
+# This is a neat little script to create desktop icon shortcuts to URLs or RDP and you may customize and duplicate each as needed
+# Devices can run powershell scripts per all pre-requisites are met and the device is shown in Intune Endpoint Manager
+# Name of script can be changed as well
+# Custom RDP script shows you how to add your custom RDP shortcut settings 
+# To get your custom RDP shortcut settings, create one in your enviorment, set all the settings for print/file forwarding, monitor configurations ect... 
+# Save it and then drag it into notepad to see the text configuration and replace my example with yours, between the @" "@ 
+DefaultShortcutsPublicDesktop.ps1
+DefaultShortcutsPublicDesktopCustomRDP.ps1

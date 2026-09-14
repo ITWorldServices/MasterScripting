@@ -1,0 +1,1 @@
+﻿Get-Recipient -RecipientPreviewFilter (get-dynamicdistributiongroup AlabamaField@brifutelectric.com).RecipientFilter -OrganizationalUnit $group.RecipientContainer | Select Displayname,alias,PrimarySmtpAddress | Export-Csv "c:\temp\AlabamaFieldDDGMembers.csv" -Notypeinformation

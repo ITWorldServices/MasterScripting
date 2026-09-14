@@ -1,0 +1,19 @@
+This script was created to remove all mail profiles from control panel on a workstation post email cutover instead of using Bittitan DMA Tool
+
+Next steps will be to create an AMP for INC so we may deploy it at a scheduled time as DMA does
+
+It will perform the following
+	Create a directory for registry backup to point to
+	Backup the registry to above location defined
+	Remove all mail profiles in the registry
+	
+A command is included to restore the registry should you need to using the above backup file
+
+The result will be for Outlook to automatically prompt a user to build a new profile when first opened
+
+Local OST data will remain intact at its original location
+
+Advising a custom naming standard in the instructions for rebuilding the profile to end users will avoid duplicate names (matching a profile name already used)
+
+
+	

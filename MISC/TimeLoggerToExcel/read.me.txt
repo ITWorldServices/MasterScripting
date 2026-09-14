@@ -1,0 +1,13 @@
+This is a basic time entry logger that pops up on your screen based on your schedule entered in task scheduler.
+
+Put the BAT file and the PY script in your Temp folder. Run the timelogstart.BAT file on a schedule from task scheduler. 
+
+It opens a window full screen and then it requests:
+
+Current time
+Company name
+Project
+Description
+
+You'll need to pip: tkinter and pandas
+

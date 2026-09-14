@@ -1,0 +1,47 @@
+#Site Settings
+SiteName,SiteAddress,SiteCity,SiteState,SiteCountry,SitePostalCode,SiteNetworkName,SiteNetworkType,SiteNetworkTags,SiteNetworkTimeZone,SiteNetworkNotes
+
+# SSID Settings
+SiteName,SSIDName,SSIDEnabled,SSIDAdminAccessible,SSIDAuthMode,SSIDEncryptionMode,SSIDPSK,SSIDSplashPage,SSIDWPAEncryptionMode,SSIDIPAssignmentMode,SSIDMinBitrate,SSIDVLAN,SSIDAvailableOnAllAPs,SSIDVisibility,SSIDEnterpriseAdminAccess,SSIDRadiusServers,SSIDRadiusAccountingEnabled,SSIDRadiusAttributeForGroupPolicies,SSIDRadiusOverride,SSIDRadiusCalledStationIDFormat,SSIDRadiusAuthenticationNasID,SSIDRadiusAccountingNasID,SSIDIPv6BridgeEnabled,SSIDMandatoryDHCPEnabled,SSIDRadiusProxyEnabled,SSIDWalledGardenEnabled,SSIDWalledGardenRanges
+
+# VLANs
+SiteName,VLANId,VLANName,VLANSubnet,VLANApplianceIP,VLANDHCPEnabled,VLANDHCPLeaseTime,VLANDHCPDNSServers,VLANDHCPBootOptionsEnabled,VLANDHCPBootNextServer,VLANDHCPBootFilename,VLANReservedIPRanges,VLANDHCPOptions
+
+# Traffic Shaping
+SiteName,TrafficShapingEnabled,TrafficShapingGlobalBandwidthLimits,TrafficShapingRules,TrafficShapingDSCPTaggingEnabled,TrafficShapingDSCPTags
+
+# Firewall Rules
+SiteName,FirewallRuleName,FirewallRulePolicy,FirewallRuleProtocol,FirewallRuleSourceCIDR,FirewallRuleSourcePort,FirewallRuleDestinationCIDR,FirewallRuleDestinationPort,FirewallRuleSyslogEnabled,FirewallRuleComment
+
+# Devices
+SiteName,DeviceSerial,DeviceName,DeviceNotes,DeviceTags,DeviceAddress,DeviceLatitude,DeviceLongitude,DeviceNetworkId,DeviceSwitchProfileId,DeviceFloorPlanId
+
+# Switch Ports
+SiteName,SwitchSerial,PortNumber,PortName,PortEnabled,PortType,PortVLAN,PortVoiceVLAN,PortAllowedVLANs,PortSTpGuard,PortRSTpEnabled,PortPoEEnabled,PortIsolationEnabled,PortAccessPolicyType,PortAccessPolicyNumber,PortMacAllowList
+
+# MX Settings (Appliance)
+SiteName,MXNetworkId,MXUplink1,MXUplink2,MXFailoverEnabled,MXFailoverVPNConnectivity,MXWANTrafficUplinkPreferences,MXVLANTagging,MXWarmSpareEnabled,MXWarmSpareSerial,MXCellularFailoverEnabled
+
+# SD-WAN Settings
+SiteName,SDWANEnabled,SDWANUplink1,SDWANUplink2,SDWANTrafficShapingEnabled,SDWANPathPreferences,SDWANVPNExclusions
+
+# Site-to-Site VPN
+SiteName,VPNMode,VPNSubnets,VPNHubs,VPNSpokes,VPNExcludedSubnets,VPNFailoverEnabled,VPNFullTunnelEnabled,VPNSplitTunnelEnabled,VPNDefaultRoute
+
+# AutoVPN 
+SiteName,AutoVPNEnabled,AutoVPNHubs,AutoVPNSpokes,AutoVPNSubnets,AutoVPNExcludedSubnets
+
+# Client VPN
+SiteName,ClientVPNEnabled,ClientVPNSubnet,ClientVPNDNSServers,ClientVPNProtocol,ClientVPNSplitTunnel,ClientVPNDefaultRoute,ClientVPNPSK
+
+# Alerts
+SiteName,AlertType,AlertEnabled,AlertEmails,AlertWebhooks,AlertSNMP,AlertSeverity,AlertThreshold,AlertFrequency
+
+# Group Policies
+SiteName,PolicyName,PolicyScheduling,PolicyBandwidthLimits,PolicyFirewallRules,PolicyVLANTagging,PolicyContentFiltering,PolicySplashAuth,PolicyVPNAccess
+
+# Configuration Templates
+SiteName,TemplateName,TemplateNetworks,TemplateConfig
+
+# API Rate Limiting (for script)
+APIRateLimitMaxCalls,APIRateLimitTimeWindow

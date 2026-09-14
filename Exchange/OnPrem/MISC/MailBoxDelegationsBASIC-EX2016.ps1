@@ -1,0 +1,1 @@
+﻿Get-Mailbox | Get-MailboxPermission | Select {$_.AccessRights}, Deny, InheritanceType, User, Identity, IsInherited, IsValid | Export-Csv C:\temp\test_permission.csv

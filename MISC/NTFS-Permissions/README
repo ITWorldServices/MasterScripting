@@ -1,0 +1,5 @@
+This script uses the Get-Acl powershell command to target a specific source folder or unc share path and output the results to a CSV
+
+Requirements:
+Change the Folder Path to match your needs
+Change the Report path to match your needs

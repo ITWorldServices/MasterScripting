@@ -1,0 +1,3 @@
+Open the script and there are three commands you can run. 
+The script name must be AddSMTPAddresses.ps1 when ran.
+You may add a domain as an alias, add a new domain and make it primary, both can be ran without the Commit flag and it will generate a log for you to review and ensure it will work.

@@ -1,0 +1,10 @@
+Pre-Requisites
+You must have the SPO-Service module installed in your local PowerShell
+
+Connect to your O365 using the SPO-Service and Global Admin account
+
+Update the Export path in the PS1 file to point to your local path for the output to save to.
+
+Run script and it will generate a user list with OneDrives to be migrated for importing into BT OneDrive migration job.  
+
+Very handy if you have mixed licenses on the source tenant and need to define which accounts you need to migrate OneDrives for BitTitan OneDrive project.

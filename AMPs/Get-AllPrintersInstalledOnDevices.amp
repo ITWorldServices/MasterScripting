@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><Policy ID="8f2f8879-ef01-4faa-9243-b707c807cd65" Name="Get-AllPrintersInstalledOnDevices" Description="VGhpcyBzY3JpcHQgd2lsbCBydW4gdGhlIEdldC1QcmludGVyIGFuZCBvdXRwdXQgdGhlIE5hbWUgb25seSB0byBhIENTViBmaWxlIGxvY2F0aW9uIG9uIGEgVU5DIHBhdGggeW91IGRlZmluZQ==" Version="2.10.0.19" RemoteCategory="0" ExecutionType="Local" MinimumPSVersionRequired="0.0.0">
+  <Object ID="{ad781034-0653-4ee8-b831-c10cca5737fa}" Type="{B6FA6D8B-EEAA-47A6-8463-7F9A4F5BBB6E}" Data="&lt;xml&gt;&lt;Parameters&gt;&lt;Parameter ParameterName=&quot;OutputPath&quot; Label=&quot;UNC Destination Path&quot; ParameterType=&quot;string&quot; Value=&quot;&quot; /&gt;&lt;Parameter ParameterName=&quot;Username&quot; Label=&quot;Username&quot; ParameterType=&quot;string&quot; Value=&quot;&quot; /&gt;&lt;Parameter ParameterName=&quot;Password&quot; Label=&quot;Password&quot; ParameterType=&quot;password&quot; Value=&quot;&quot; /&gt;&lt;/Parameters&gt;&lt;/xml&gt;" />
+  <LinkManager xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/PolicyExecutor">
+    <hashset xmlns:d2p1="http://schemas.datacontract.org/2004/07/System" />
+  </LinkManager>
+  <Diagnostics OriginalVersion="2.60.0.3" />
+  <Activity mc:Ignorable="sads sap" x:Class="Policy Builder" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:mva="clr-namespace:Microsoft.VisualBasic.Activities;assembly=System.Activities" xmlns:p="clr-namespace:PolicyExecutor;assembly=PolicyExecutionEngine" xmlns:sads="http://schemas.microsoft.com/netfx/2010/xaml/activities/debugger" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:scg="clr-namespace:System.Collections.Generic;assembly=mscorlib" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <x:Members>
+      <x:Property Name="PolicyGUID" Type="InArgument(x:String)" />
+    </x:Members>
+    <sap:VirtualizedContainerService.HintSize>504,744.666666666667</sap:VirtualizedContainerService.HintSize>
+    <mva:VisualBasic.Settings>Assembly references and imported namespaces serialized as XML namespaces</mva:VisualBasic.Settings>
+    <p:PolicySequence DisplayName="Policy Builder" sap:VirtualizedContainerService.HintSize="504,744.666666666667" mva:VisualBasic.Settings="Assembly references and imported namespaces serialized as XML namespaces">
+      <p:PolicySequence.Activities>
+        <p:RunPowerShellScript AssemblyName="PolicyExecutionEngine, Version=2.60.0.3, Culture=neutral, PublicKeyToken=null" DisplayName="Run PowerShell Script" sap:VirtualizedContainerService.HintSize="468,521.333333333333" Moniker="5ea658a8-821b-4efe-88da-20e83ea9989c" OutPut_64="[RunPowerShellScript_OutPut_64]" Result="[RunPowerShellScript_Result]" ResultString="[RunPowerShellScript_ResultString]" Results_x64="[RunPowerShellScript_Results_x64]" RunAsCurrentLoggedOnUser="False" ScriptExecutionMethod="ExecuteDebug" TypeName="RunPowerShellScript" genArgEvent="7dd2905f-261d-486a-8bac-592505d0cfc0" m_bTextLinkChange="False" script="IwBtAG8AdQBuAHQAIABuAGUAdAB3AG8AcgBrACAAcwBoAGEAcgBlAA0ACgBuAGUAdAAgAHUAcwBlACAAJABPAHUAdABwAHUAdABQAGEAdABoACAALwB1AHMAZQByADoAIgAkAFUAcwBlAHIAbgBhAG0AZQAiACAAJwAkAFAAYQBzAHMAdwBvAHIAZAAnAA0ACgANAAoAIwAgAEQAZQBmAGkAbgBlACAAdABoAGUAIABuAGUAdAB3AG8AcgBrACAAcwBoAGEAcgBlACAAcABhAHQAaAANAAoAJABuAGUAdAB3AG8AcgBrAFMAaABhAHIAZQBQAGEAdABoACAAPQAgACIAJABPAHUAdABwAHUAdABQAGEAdABoACIADQAKAA0ACgAjACAARwBlAHQAIAB0AGgAZQAgAGMAbwBtAHAAdQB0AGUAcgAgAG4AYQBtAGUADQAKACQAYwBvAG0AcAB1AHQAZQByAE4AYQBtAGUAIAA9ACAAJABlAG4AdgA6AEMATwBNAFAAVQBUAEUAUgBOAEEATQBFAA0ACgANAAoAIwAgAEQAZQBmAGkAbgBlACAAdABoAGUAIABvAHUAdABwAHUAdAAgAGYAaQBsAGUAIABwAGEAdABoAA0ACgAkAG8AdQB0AHAAdQB0AEYAaQBsAGUAUABhAHQAaAAgAD0AIABKAG8AaQBuAC0AUABhAHQAaAAgAC0AUABhAHQAaAAgACQAbgBlAHQAdwBvAHIAawBTAGgAYQByAGUAUABhAHQAaAAgAC0AQwBoAGkAbABkAFAAYQB0AGgAIAAiACQAYwBvAG0AcAB1AHQAZQByAE4AYQBtAGUALgBjAHMAdgAiAA0ACgANAAoAIwAgAEcAZQB0ACAAdABoAGUAIABwAHIAaQBuAHQAZQByACAAbgBhAG0AZQBzACAAYQBuAGQAIABlAHgAcABvAHIAdAAgAHQAbwAgAEMAUwBWAA0ACgBHAGUAdAAtAFAAcgBpAG4AdABlAHIAIAB8ACAAUwBlAGwAZQBjAHQALQBPAGIAagBlAGMAdAAgAE4AYQBtAGUAIAB8ACAARQB4AHAAbwByAHQALQBDAHMAdgAgAC0AUABhAHQAaAAgACQAbwB1AHQAcAB1AHQARgBpAGwAZQBQAGEAdABoACAALQBOAG8AVAB5AHAAZQBJAG4AZgBvAHIAbQBhAHQAaQBvAG4A">
+          <p:RunPowerShellScript.InArgs>
+            <p:InArg Item="{x:Null}" ItemProp="{x:Null}" x:Key="OutputPath" ArgType="string" DisplayArg="Input Parameters.UNC Destination Path" DisplayName="UNC Output Path" Name="OutputPath" isRequired="False">
+              <p:InArg.Arg>
+                <InArgument x:TypeArguments="x:Object">[OutputPath]</InArgument>
+              </p:InArg.Arg>
+            </p:InArg>
+            <p:InArg Item="{x:Null}" ItemProp="{x:Null}" x:Key="Username" ArgType="string" DisplayArg="Input Parameters.Username" DisplayName="Username" Name="Username" isRequired="False">
+              <p:InArg.Arg>
+                <InArgument x:TypeArguments="x:Object">[Username]</InArgument>
+              </p:InArg.Arg>
+            </p:InArg>
+            <p:InArg Item="{x:Null}" ItemProp="{x:Null}" x:Key="Password" ArgType="password" DisplayArg="Input Parameters.Password" DisplayName="Password" Name="Password" isRequired="False">
+              <p:InArg.Arg>
+                <InArgument x:TypeArguments="x:Object">[Password]</InArgument>
+              </p:InArg.Arg>
+            </p:InArg>
+          </p:RunPowerShellScript.InArgs>
+          <p:RunPowerShellScript.OutArgs>
+            <scg:Dictionary x:TypeArguments="x:String, p:OutArg" />
+          </p:RunPowerShellScript.OutArgs>
+        </p:RunPowerShellScript>
+      </p:PolicySequence.Activities>
+      <p:PolicySequence.Variables>
+        <Variable x:TypeArguments="x:String" Name="RunPowerShellScript_OutPut_64" />
+        <Variable x:TypeArguments="x:String" Name="RunPowerShellScript_ResultString" />
+        <Variable x:TypeArguments="scg:IEnumerable(x:Object)" Name="RunPowerShellScript_Results_x64" />
+        <Variable x:TypeArguments="x:Double" Name="RunPowerShellScript_Result" />
+        <Variable x:TypeArguments="x:String" Name="OutputPath" />
+        <Variable x:TypeArguments="x:String" Name="Username" />
+        <Variable x:TypeArguments="p:Password" Name="Password" />
+      </p:PolicySequence.Variables>
+    </p:PolicySequence>
+  </Activity>
+</Policy>

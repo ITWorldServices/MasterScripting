@@ -1,0 +1,17 @@
+Pre-requisites
+You need MSOL-SERVICE installed in powershell and be connected to MSOL-SERVICE in a powershell ISE session
+Global Admin role account member
+
+ForcePasswordResetAllUsers.ps1
+Will only prompt all users to reset password at next logon
+
+ForcePasswordResetAllUsersDefinedNewPassword.ps1
+Will reset all users passwords to predefined ones you create
+
+Get-MsolUser -All | Export-Csv "path to file name"
+
+If using NewPassword ps1 you can add a column in your exported CSV named "NewPassword" and insert your own random password
+
+Open either script in ISE enter "path to file name" and run it.
+
+You may also run the last line of the script independently and change variable $upn to be a specific UPN for single user.

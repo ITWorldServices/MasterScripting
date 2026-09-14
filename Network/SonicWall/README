@@ -1,0 +1,4 @@
+This is a handy tool to view the EXP file output of SonicWall firewall settings so you can read it in plain text
+This is a Java runtime script so you need Java installed in order to run the application
+Extract the contents and open a powershell window to run the JAR file 
+Also review the README in the ZIP for further information

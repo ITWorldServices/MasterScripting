@@ -1,0 +1,84 @@
+#Site Settings
+SiteName,SiteAddress,SiteCity,SiteState,SiteCountry,SitePostalCode,SiteNetworkName,SiteNetworkType,SiteNetworkTags,SiteNetworkTimeZone,SiteNetworkNotes
+Site 1,123 Main St,Anytown,CA,USA,12345,Example Network 1,wireless,tag1,tag2,America/Los_Angeles,Example notes for site 1
+Site 2,456 Elm St,Othertown,TX,USA,67890,Example Network 2,wireless,tag3,tag4,America/New_York,Example notes for site 2
+
+# SSID Settings
+SiteName,SSIDName,SSIDEnabled,SSIDAdminAccessible,SSIDAuthMode,SSIDEncryptionMode,SSIDPSK,SSIDSplashPage,SSIDWPAEncryptionMode,SSIDIPAssignmentMode,SSIDMinBitrate,SSIDVLAN,SSIDAvailableOnAllAPs,SSIDVisibility,SSIDEnterpriseAdminAccess,SSIDRadiusServers,SSIDRadiusAccountingEnabled,SSIDRadiusAttributeForGroupPolicies,SSIDRadiusOverride,SSIDRadiusCalledStationIDFormat,SSIDRadiusAuthenticationNasID,SSIDRadiusAccountingNasID,SSIDIPv6BridgeEnabled,SSIDMandatoryDHCPEnabled,SSIDRadiusProxyEnabled,SSIDWalledGardenEnabled,SSIDWalledGardenRanges
+Site 1,"Corporate WiFi",true,true,"wpa2","aes","password123",,"wpa2","dhcp",12,10,true,true,true,"192.168.1.1:1812:secret",true,"Filter-Id",false,"mac:SSID",,"",false,true,false,true,"192.168.1.0/24"
+Site 2,"Guest WiFi",true,false,"open","none",,,"none","dhcp",6,20,true,false,false,,,false,,,false,,,false,false,false,false,""
+
+# VLANs
+SiteName,VLANId,VLANName,VLANSubnet,VLANApplianceIP,VLANDHCPEnabled,VLANDHCPLeaseTime,VLANDHCPDNSServers,VLANDHCPBootOptionsEnabled,VLANDHCPBootNextServer,VLANDHCPBootFilename,VLANReservedIPRanges,VLANDHCPOptions
+Site 1,400,"Site 1 Data","10.4.0.0/24","10.4.0.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.0.10:10.4.0.20:Reserved for servers","3:ip:10.4.0.1"
+Site 1,405,"Site 1 VOIP","10.4.5.0/24","10.4.5.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.5.10:10.4.5.20:Reserved for servers","3:ip:10.4.5.1"
+Site 1,411,"Site 1 WLAN","10.4.11.0/24","10.4.11.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.11.10:10.4.11.20:Reserved for servers","3:ip:10.4.11.1"
+Site 1,412,"Site 1 Guest","10.4.12.0/24","10.4.12.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.12.10:10.4.12.20:Reserved for servers","3:ip:10.4.12.1"
+Site 1,413,"Site 1 Client VPN","10.4.13.0/24","10.4.13.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.13.10:10.4.13.20:Reserved for servers","3:ip:10.4.13.1"
+Site 1,415,"Site 1 Security","10.4.15.0/24","10.4.15.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.15.10:10.4.15.20:Reserved for servers","3:ip:10.4.15.1"
+Site 1,499,"Site 1 Management","10.4.99.0/24","10.4.99.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.4.99.10:10.4.99.20:Reserved for servers","3:ip:10.4.99.1"
+Site 2,500,"Site 2 Data","10.5.0.0/24","10.5.0.1",true,"1 day","8.8.8.8,8.8.4.4",false,,,,"10.5.0.10:10.5.0.20:Reserved for servers","3:ip:10.5.0.1"
+
+# Traffic Shaping
+SiteName,TrafficShapingEnabled,TrafficShapingGlobalBandwidthLimits,TrafficShapingRules,TrafficShapingDSCPTaggingEnabled,TrafficShapingDSCPTags
+Site 1,true,"100:100:50:50","application:zoom:100:100:high:46",true,"46"
+Site 2,true,"200:200:100:100","application:skype:200:200:high:46",true,"46"
+
+# Firewall Rules
+SiteName,FirewallRuleName,FirewallRulePolicy,FirewallRuleProtocol,FirewallRuleSourceCIDR,FirewallRuleSourcePort,FirewallRuleDestinationCIDR,FirewallRuleDestinationPort,FirewallRuleSyslogEnabled,FirewallRuleComment
+Site 1,"Allow HTTP","allow","tcp","any","any","any","80",true,"Allow HTTP traffic"
+Site 2,"Block FTP","deny","tcp","any","any","any","21",true,"Block FTP traffic"
+
+# Devices
+SiteName,DeviceSerial,DeviceName,DeviceNotes,DeviceTags,DeviceAddress,DeviceLatitude,DeviceLongitude,DeviceNetworkId,DeviceSwitchProfileId,DeviceFloorPlanId
+Site 1,"Q2XX-XXXX-XXXX","Main Office AP","Main access point","office,main","123 Main St",40.7128,-74.0060,"N_1234",,""
+Site 2,"Q3YY-YYYY-YYYY","Branch Office AP","Branch access point","branch,secondary","456 Elm St",32.7767,-96.7970,"N_5678",,""
+
+# Switch Ports
+SiteName,SwitchSerial,PortNumber,PortName,PortEnabled,PortType,PortVLAN,PortVoiceVLAN,PortAllowedVLANs,PortSTpGuard,PortRSTpEnabled,PortPoEEnabled,PortIsolationEnabled,PortAccessPolicyType,PortAccessPolicyNumber,PortMacAllowList
+Site 1,"Q2XX-XXXX-XXXX",1,"Uplink",true,"trunk",1,10,"1-10","bpdu",true,true,false,"",,""
+Site 2,"Q3YY-YYYY-YYYY",2,"Workstation",true,"access",20,,,"root",true,false,false,"",,""
+
+# MX Settings (Appliance)
+SiteName,MXNetworkId,MXUplink1,MXUplink2,MXFailoverEnabled,MXFailoverVPNConnectivity,MXWANTrafficUplinkPreferences,MXVLANTagging,MXWarmSpareEnabled,MXWarmSpareSerial,MXCellularFailoverEnabled
+Site 1,"N_1234","dhcp","static:192.168.2.2:255.255.255.0:192.168.2.1",true,true,"application:zoom:wan1","10",true,"Q2XX-XXXX-XXXX",true
+Site 2,"N_5678","dhcp","static:192.168.3.2:255.255.255.0:192.168.3.1",true,true,"application:skype:wan2","20",true,"Q3YY-YYYY-YYYY",true
+
+# SD-WAN Settings
+SiteName,SDWANEnabled,SDWANUplink1,SDWANUplink2,SDWANTrafficShapingEnabled,SDWANPathPreferences,SDWANVPNExclusions
+Site 1,true,"dhcp","static:192.168.3.2:255.255.255.0:192.168.3.1",true,"application:zoom:wan1","192.168.3.0/24"
+Site 2,true,"dhcp","static:192.168.4.2:255.255.255.0:192.168.4.1",true,"application:skype:wan2","192.168.4.0/24"
+
+# Site-to-Site VPN
+SiteName,VPNMode,VPNSubnets,VPNHubs,VPNSpokes,VPNExcludedSubnets,VPNFailoverEnabled,VPNFullTunnelEnabled,VPNSplitTunnelEnabled,VPNDefaultRoute
+Site 1,"hub","192.168.1.0/24","hub1","spoke1","192.168.2.0/24",true,true,false,true
+Site 2,"spoke","192.168.2.0/24","hub1","spoke2","192.168.3.0/24",true,false,true,false
+
+# AutoVPN 
+SiteName,AutoVPNEnabled,AutoVPNHubs,AutoVPNSpokes,AutoVPNSubnets,AutoVPNExcludedSubnets
+Site 1,true,"hub1","spoke1","192.168.1.0/24","192.168.2.0/24"
+Site 2,true,"hub1","spoke2","192.168.2.0/24","192.168.3.0/24"
+
+# Client VPN
+SiteName,ClientVPNEnabled,ClientVPNSubnet,ClientVPNDNSServers,ClientVPNProtocol,ClientVPNSplitTunnel,ClientVPNDefaultRoute,ClientVPNPSK
+Site 1,true,"192.168.4.0/24","8.8.8.8,8.8.4.4","l2tp",true,true,"vpnpassword"
+Site 2,true,"192.168.5.0/24","8.8.8.8,8.8.4.4","pptp",false,true,"vpnpassword2"
+
+# Alerts
+SiteName,AlertType,AlertEnabled,AlertEmails,AlertWebhooks,AlertSNMP,AlertSeverity,AlertThreshold,AlertFrequency
+Site 1,"Network Down",true,"admin@example.com","https://webhook.example.com",true,"critical",5,"5 minutes"
+Site 2,"Device Offline",true,"support@example.com","https://webhook.example2.com",true,"high",10,"10 minutes"
+
+# Group Policies
+SiteName,PolicyName,PolicyScheduling,PolicyBandwidthLimits,PolicyFirewallRules,PolicyVLANTagging,PolicyContentFiltering,PolicySplashAuth,PolicyVPNAccess
+Site 1,"Guest Policy","8am-6pm","100:100","allow:tcp:any:any:any:80",10,"block:adult",true,true
+Site 2,"Employee Policy","9am-5pm","200:200","deny:tcp:any:any:any:21",20,"allow:work",false,false
+
+# Configuration Templates
+SiteName,TemplateName,TemplateNetworks,TemplateConfig
+Site 1,"Office Template","Office Network","config1"
+Site 2,"Branch Template","Branch Network","config2"
+
+# API Rate Limiting (for script)
+APIRateLimitMaxCalls,APIRateLimitTimeWindow
+1000,60

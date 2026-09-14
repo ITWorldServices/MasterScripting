@@ -1,0 +1,2 @@
+This file will scan any local drive or server share path location and identify any unsupported characters that reside on the source drive to migrate to Azure Files via StorageSync method.
+In addition, you can export the the results into a CSV and rename them, either with a default "blank space" or any defined character of your choosing. The script will rename all of them for you.

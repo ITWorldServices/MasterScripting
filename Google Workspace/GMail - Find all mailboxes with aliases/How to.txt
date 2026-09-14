@@ -1,0 +1,14 @@
+# The following steps will let you run the a scriupt to pull out all of the aliases on a gmail tenant. This will only be for user accounts. 
+# Please note I had to run this twice for the permissions to kick in and have the script run.
+
+1. Open https://script.google.com. 
+2. Click New project.
+3. Name the script project in the title
+4. Copy and paste the script in the file Get GMail user aliases.txt to the script editor, overwriting existing function myFunction() {} code
+5. Click Services in the left navigation panel
+6. Select Admin SDK API
+7. Click Add
+8. Click Save Google Apps Script project button in the toolbar
+9. Click Run
+10. It will ask for your permissions in the first run
+11. After you grant the permission, the script shall run and print out the results in the Execution log.

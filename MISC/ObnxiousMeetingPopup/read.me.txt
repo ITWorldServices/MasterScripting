@@ -1,0 +1,20 @@
+Obnoxious meeting popup is exactly that. 
+
+NOTE: This script only works with old outlook not new outlook!
+
+It will:
+1) Figure out how many screens you are using
+2) Display a full screen message on each one saying "Meeting Alert" and below that the name of the meeting.
+3) It will have a Close button on the bottom right corner of your main screen. 
+4) It will trigger every time your Outlook pops up a reminder to you.
+
+Load Python on your computer
+# Install these two python modules before using this script:
+# pip install tkinter
+# pip install screeninfo
+
+
+
+Copy the VBA script into your Outlook in the "ThisOutlookSession" code space.
+Copy the PY script into the C:\TEMP folder. 
+

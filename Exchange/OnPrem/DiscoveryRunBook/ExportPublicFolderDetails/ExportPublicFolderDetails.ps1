@@ -1,0 +1,1 @@
+﻿Get-PublicFolder -Recurse -ResultSize Unlimited | Get-PublicFolderClientPermission | export-csv -Path c:\temp\PFExport.csv

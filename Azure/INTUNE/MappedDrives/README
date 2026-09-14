@@ -1,0 +1,13 @@
+PREREQUISITES:
+Networking - You need routes to your destination and determine if that is persistent for your environment
+DNS - You need name resolution working from Intune AzureAD Joined device
+Fileshares created and accessible in file explorer from the host or Azure Files 
+
+USE THIS LINK TO GENERATE YOUR PS1 SCRIPT
+https://intunedrivemapping.azurewebsites.net/DriveMapping
+
+DON'T MAKE UP YOUR OWN FILE NAME
+DriveMapping.ps1 is specific here
+
+Reference:
+https://docs.microsoft.com/en-us/mem/intune/apps/intune-management-extension

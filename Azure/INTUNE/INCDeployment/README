@@ -1,0 +1,13 @@
+If you modify Line 24 and Line 28 with the specific customer details, you can configure this script as a PowerShell script to run as a Workstation Platform script in Intune.
+
+Line 24 = the customer number - This will be the first four numbers in the file name of the windows agent file if downloaded from within the client's INC portal.
+Line 28 = Define which INC instance the client is in.
+
+This script will negate the old method of needing to update the INC token using the MSI install method. It can be used to replace this older method, 
+as it will automatically grab the new token when it is issued.
+
+When configuring in Intune you need the following options:
+
+Run this script using the logged on credentials = No
+Enforce script signature check = No
+Run script in 64 bit PowerShell Host = Yes

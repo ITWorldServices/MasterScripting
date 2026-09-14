@@ -1,0 +1,3 @@
+"Path","Identity","AccessType","Rights","Inheritance"
+"Y:\ttbntfile1\shared\appsdata\groups\0-Policies and Procedures Manual","TONNANDBLANK\roger.knaggs","Allow","FullControl","False"
+

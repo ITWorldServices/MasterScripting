@@ -1,0 +1,16 @@
+# This script will rename all Display Names on all users defined in a CSV file in Active Directory
+
+# Optional, uncomment Importing the Active Directory PowerShell Module on line 2
+
+# Your CSV should contain all variables as header names
+# 	$Username = UserPrincipalName
+#	$SamAccount = SamAccountName
+#	$FirstName = GivenName
+#	$LastName = Surname
+#	$DisplayName = DisplayName
+#	$NewDisplayName = New Display Name you want to be shown
+
+# Edit the path to your Transcript log file location and include your desired filename.txt at the end of it on line 5
+
+# Insert the path to your CSV file on line 9
+

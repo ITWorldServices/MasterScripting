@@ -1,0 +1,55 @@
+To extract the plain text site-to-site VPN passwords you can follow this article: 
+
+
+(I have used Method 2 and it worked on a Fortigate 60F firewall. DPH)
+
+
+
+https://whatifsecu.tech/?p=158
+
+
+In various scenarios, you may want to recover psk plaintext from encrypted format out of a FortiGate or from a FortiGate config backup.
+
+Method 1:
+
+“Print Instructions” menu through a FortiClient profile, ther are 2 alternatives for recovering PSK:
+
+I don’t remember if you need to change existing tunnel or duplicate tunnel or restore a fake config …
+
+https://forum.fortinet.com/tm.aspx?m=137961
+
+Method 2:
+
+1) Log in into the web-interface as a (super?) admin.
+
+2) Change your url/path to https://fortigateip/api/v2/cmdb/vpn.ipsec/phase1-interface?plain-text-password=1
+
+3) Firefox understands the JSON reply. I hope your browser does too. Search for the term “psksecret” on the page. Passwords/secrets should be listed as plain text passwords now.
+
+Method 3:
+
+You can always view the Pre-Shared Key of a WiFi SSID via the GUI. But since FortiGate/FortiOS uses the same algorithm for storing these passwords as for (say) phase1 PSK’s, you can simply:
+
+Create a dummy SSID via the GUI.
+
+Change the password from CLI.
+
+config wireless-controller vap
+
+edit “dummy-decrypt”
+
+set passphrase ENC some-base64-string-from-phase1-PSK
+
+end
+
+Go back to the GUI.
+
+Edit the dummy SSID.
+
+Push the eye logo to reveal the SSID/PSK/whatever password.
+
+I conclude that the encoding method/key must be somewhat fixed in FortiOS (since a FortiVM can decode passwords as well).
+
+By design, password can’t be be salted or they will be no way to restore a config file during RMA process from example.
+
+Note: All three methods do not all work on any FortiOS versions.

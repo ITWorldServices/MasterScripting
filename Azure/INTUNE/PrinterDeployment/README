@@ -1,0 +1,9 @@
+PREREQUISITES:
+Print Server configured with permissions
+Universal Print Agent installed on Print Server
+Azure Universal Print has printers and they are shared
+You can record and create a printers.csv file with your unique sharedId of printer
+Universal Print Connector deployed and installed on Intune AzureAD Joined device 
+Printers show available to add through Control Panel > Hardware and devices > Printers > Add Printer > printer name matches and shows "cloud" under it
+
+Now you can create/modify this example script to run in Intune 

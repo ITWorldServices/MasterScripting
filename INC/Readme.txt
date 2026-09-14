@@ -1,0 +1,4 @@
+PowerShell Command to schedule and execute remote install script. Use this script when a device is registered to INC, has no TakeControl access and we cannot leverage a tech or user to assist with remediation. Use File Transfer to copy both the script and installation file into C:\Temp of the device, then execute the command below using System Shell via INC. You can edit the time for execution to fit your immediate needs.
+
+
+schtasks /create /tn "ReinstallNableAgent" /tr "powershell.exe -ExecutionPolicy Bypass -File C:\temp\INCAgentRemoteInstaller.ps1 -Reinstall" /sc once /st 00:10 /ru “SYSTEM” /f

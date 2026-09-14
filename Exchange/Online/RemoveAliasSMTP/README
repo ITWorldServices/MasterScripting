@@ -1,0 +1,8 @@
+This is experimental at this time.
+
+Pre-Requisites
+ExchangeOnline Module 
+
+Change any FQDN located in first line of script for the $Records variable to match your domain name you want to remove.
+
+Then run the script while connected to Msol-Server with any Global Admin role user account.

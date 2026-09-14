@@ -1,0 +1,1 @@
+﻿Get-Mailbox -Filter "*" | Get-MailboxPermission -ErrorAction Continue | Export-Csv -Path c:\temp\ERAI-MailboxDelegations.csv -NoTypeInformation

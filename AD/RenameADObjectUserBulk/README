@@ -1,0 +1,14 @@
+# This script will rename all Users AD Object names defined in a CSV file in Active Directory
+
+# Uncomment the import Active Directory PowerShell module if needed on line 2
+
+# Edit the path to your Transcript log file location and include your desired filename.txt at the end of it on line 5 - NOTE - the folder path must exist but the file will be generated if the path exists
+
+# Insert the path to your CSV file on line 9
+
+# Your CSV should contain all variables as header names
+# 	$SamAccount = SamAccountName
+#	$DisplayName = DisplayName
+#	$NewDisplayName = New Display Name you want to be shown
+
+

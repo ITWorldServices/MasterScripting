@@ -1,0 +1,6 @@
+# Install Chocolatey On Workstations
+InstallChocolately.ps1 is custom named here script obtained from:
+https://docs.chocolatey.org/en-us/choco/setup#install-from-powershell-v3
+
+# Install Applications via Chocolately - You may customize this to match your needs
+ChocoInstallApps.ps1  

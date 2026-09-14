@@ -1,0 +1,2 @@
+Connect-ExchangeOnline -UserPrincipalName migrationwiz-destination@eraind.onmicrosoft.us -ExchangeEnvironmentName O365USGovGCCHigh -ShowProgress $true
+Connect-AzureAD -AzureEnvironmentName AzureUSGovernment

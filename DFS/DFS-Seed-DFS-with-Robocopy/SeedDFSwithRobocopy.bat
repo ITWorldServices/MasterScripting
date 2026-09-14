@@ -1,0 +1,1 @@
+robocopy e:\DFSShares\ "\\wh-prod-dc01\e$\DFS-Robo" /e /b /copyall /r:6 /w:5 /MT:64 /xd DfsrPrivate /tee /log:c:\temp\dfslog.txt /v

@@ -1,0 +1,20 @@
+This will allow you to change all users UPN to a new email domain
+
+Pre-Requisites
+MSOL-SERVICE powershell module installed
+All users will be expected to logout of any current sessions and relogon once this script is completed
+
+Export all MsolUser -All | Export-CSV "PATH TO CSV"
+
+Add additional column in the output with title "NewUserPrincipalName"
+
+Copy the entire column of UserPrincipalName and paste a duplicate column  
+
+Find and replace old domain with new domain on the NewUserPrincipalName column only
+
+Open ChangeAllUsersUPN.ps1 in ISE session connected to your Azure AD using the MSOL-SERVICE and a Global Admin role user account
+
+Insert path to your exported and updated CSV file
+
+Run script
+
