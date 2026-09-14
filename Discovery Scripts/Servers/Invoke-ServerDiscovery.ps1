@@ -78,14 +78,14 @@ function Add-DataSheet {
     }
     $headers = @($data[0].PSObject.Properties.Name)
     for ($column=0; $column -lt $headers.Count; $column++) {
-        $sheet.Cells[1,$column+1].Value = $headers[$column]
-        $sheet.Cells[1,$column+1].Style.Font.Bold = $true
+        $sheet.Cells[1,($column+1)].Value = $headers[$column]
+        $sheet.Cells[1,($column+1)].Style.Font.Bold = $true
     }
     for ($row=0; $row -lt $data.Count; $row++) {
         for ($column=0; $column -lt $headers.Count; $column++) {
             $value = $data[$row].PSObject.Properties[$headers[$column]].Value
             if ($value -is [array]) { $value = Join-Unique $value }
-            $sheet.Cells[$row+2,$column+1].Value = $value
+            $sheet.Cells[($row+2),($column+1)].Value = $value
         }
     }
     $sheet.View.FreezePanes(2,1)
@@ -433,7 +433,7 @@ try {
     Set-TemplateRow $book.Worksheets['Azure Agents-Apps-Services'] 1 2 $av
 
     $lob=$book.Worksheets['LoB Applications']
-    if($lob){$lob.Cells[2,1].Value=$ComputerName;for($i=0;$i -lt [math]::Min($applications.Count,$lob.Dimension.End.Column-1);$i++){$lob.Cells[2,$i+2].Value=$applications[$i].Name}}
+    if($lob){$lob.Cells[2,1].Value=$ComputerName;for($i=0;$i -lt [math]::Min($applications.Count,$lob.Dimension.End.Column-1);$i++){$lob.Cells[2,($i+2)].Value=$applications[$i].Name}}
 
     $shareSheet=$book.Worksheets['File Server Shares']
     $securitySheet=$book.Worksheets['File Server Security']
