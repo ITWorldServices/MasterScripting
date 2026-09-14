@@ -63,7 +63,10 @@ function Convert-ToCellValue {
     if ($null -eq $Value) { return $null }
     if ($Value -is [bool]) { return $(if ($Value) { 'Yes' } else { 'No' }) }
     if ($Value -is [array]) { return (Join-Unique $Value) }
-    return $Value
+    if ($Value -is [datetime] -or $Value -is [string] -or $Value -is [decimal] -or $Value.GetType().IsPrimitive) {
+        return $Value
+    }
+    return [string]$Value
 }
 
 function Set-WorksheetStyle {
@@ -649,7 +652,6 @@ try {
     $null=Add-DataSheet $book 'Diagnostics' $script:Diagnostics
 
     $book.Worksheets.Delete($workingSheetName)
-    $book.View.ActiveTab=0
     Close-ExcelPackage -ExcelPackage $package
     $package=$null
 } catch {
