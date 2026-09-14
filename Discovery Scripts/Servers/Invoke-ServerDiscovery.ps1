@@ -402,10 +402,20 @@ if($features.Name -contains 'DHCP'){
         if(-not(Get-Command Get-DhcpServerv4Scope -ErrorAction SilentlyContinue)){throw 'DHCP cmdlets are unavailable.'}
         foreach($s in Get-DhcpServerv4Scope -ComputerName $ComputerName){
             $stats=try{Get-DhcpServerv4ScopeStatistics -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{$null}
+            $exclusions=try{Get-DhcpServerv4ExclusionRange -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{@()}
+            $reservations=try{Get-DhcpServerv4Reservation -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{@()}
+            $options=try{Get-DhcpServerv4OptionValue -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{@()}
+            $failover=try{Get-DhcpServerv4Failover -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{$null}
             [pscustomobject][ordered]@{
                 ServerName=$ComputerName; ScopeName=$s.Name; Status=$s.State; ScopeId=$s.ScopeId
                 StartRange=$s.StartRange; EndRange=$s.EndRange; SubnetMask=$s.SubnetMask
+                AddressPool=('{0} - {1}' -f $s.StartRange,$s.EndRange)
+                Exclusions=Join-Unique @($exclusions|ForEach-Object{'{0} - {1}' -f $_.StartRange,$_.EndRange})
+                Reservations=Join-Unique @($reservations|ForEach-Object{'{0} ({1})' -f $_.IPAddress,$_.Name})
+                ScopeOptions=@($options|ForEach-Object{'{0} {1}: {2}' -f $_.OptionId,$_.Name,($_.Value -join ', ')})
                 LeaseDuration=$s.LeaseDuration; Utilization=$(if($stats){$stats.PercentageInUse}else{$null})
+                NAP=$(if($s.PSObject.Properties['NapEnable']){$s.NapEnable}else{$null})
+                Failover=$(if($failover){$failover.Name}else{$null})
             }
         }
     }
