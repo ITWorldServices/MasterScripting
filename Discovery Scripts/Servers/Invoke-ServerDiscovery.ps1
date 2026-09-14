@@ -33,11 +33,13 @@ function Invoke-Collector {
     try {
         $result = @(& $Action)
         Add-Diagnostic $Name 'Success' 'Collector completed.' $result.Count
-        return $result
+        Write-Output -NoEnumerate $result
+        return
     } catch {
         Add-Diagnostic $Name 'Failed' $_.Exception.Message
         Write-Warning ('{0}: {1}' -f $Name,$_.Exception.Message)
-        return @()
+        Write-Output -NoEnumerate @()
+        return
     }
 }
 
@@ -59,7 +61,7 @@ function Set-TemplateRow {
     param($Worksheet,[int]$HeaderRow,[int]$DataRow,[hashtable]$Values)
     if (-not $Worksheet -or -not $Worksheet.Dimension) { return }
     for ($column=1; $column -le $Worksheet.Dimension.End.Column; $column++) {
-        $header = [string]$Worksheet.Cells[$HeaderRow,$column].Text
+        $header = ([string]$Worksheet.Cells[$HeaderRow,$column].Text).Trim()
         if ($header -and $Values.ContainsKey($header)) {
             $Worksheet.Cells[$DataRow,$column].Value = $Values[$header]
         }
@@ -85,7 +87,10 @@ function Add-DataSheet {
         for ($column=0; $column -lt $headers.Count; $column++) {
             $value = $data[$row].PSObject.Properties[$headers[$column]].Value
             if ($value -is [array]) { $value = Join-Unique $value }
-            $sheet.Cells[($row+2),($column+1)].Value = $value
+            $cell = $sheet.Cells[($row+2),($column+1)]
+            if ($value -is [bool]) { $value = if ($value) { 'Yes' } else { 'No' } }
+            $cell.Value = $value
+            if ($value -is [datetime]) { $cell.Style.Numberformat.Format = 'yyyy-mm-dd HH:mm:ss' }
         }
     }
     $sheet.View.FreezePanes(2,1)
@@ -206,7 +211,9 @@ $network = Invoke-Collector 'Network' {
                 ComputerName=$ComputerName; Interface=$config.InterfaceAlias; IPAddress=$ip.IPAddress
                 PrefixLength=$ip.PrefixLength; SubnetMask=Convert-PrefixToMask $ip.PrefixLength
                 Gateway=Join-Unique $config.IPv4DefaultGateway.NextHop
-                DNS=Join-Unique $config.DNSServer.ServerAddresses
+                DNS=Join-Unique @($config.DNSServer.ServerAddresses | Where-Object {
+                    ($_ -as [ipaddress]) -and ([ipaddress]$_).AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork
+                })
                 MacAddress=$config.NetAdapter.MacAddress
             }
         }
@@ -286,11 +293,13 @@ $printers = Invoke-Collector 'Printers' {
 }
 
 $accounts = Invoke-Collector 'Local Accounts' {
+    if($features.Name -contains 'AD-Domain-Services'){ return }
     if(-not(Get-Command Get-LocalUser -ErrorAction SilentlyContinue)){throw 'Get-LocalUser is unavailable.'}
     Get-LocalUser | Sort-Object Name | Select-Object @{n='ComputerName';e={$ComputerName}},Name,Enabled,Description,LastLogon,PasswordExpires
 }
 
 $groups = Invoke-Collector 'Local Groups' {
+    if($features.Name -contains 'AD-Domain-Services'){ return }
     if(-not(Get-Command Get-LocalGroupMember -ErrorAction SilentlyContinue)){throw 'Local group cmdlets are unavailable.'}
     foreach($group in Get-LocalGroup) {
         try {
