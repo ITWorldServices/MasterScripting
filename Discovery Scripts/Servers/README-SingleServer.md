@@ -8,7 +8,7 @@ The Phase 1 script:
 
 - Does not enumerate computer objects from Active Directory.
 - Does not use PowerShell remoting or WinRM.
-- Does not install modules or other software.
+- Installs only the pinned ImportExcel 7.8.10 module when it is missing; no other application software is installed.
 - Does not use `Win32_Product`.
 - Does not recurse through file shares or calculate folder sizes.
 - Reads share-root NTFS permissions only.
@@ -23,17 +23,20 @@ Run the first test during a normal maintenance window. The collection is read-on
 - Windows Server 2016 or later
 - Windows PowerShell 5.1 or PowerShell 7 on Windows
 - Local administrator is recommended
-- ImportExcel PowerShell module
+- Outbound HTTPS access to PowerShell Gallery and NuGet endpoints for the first run
 - The workbook template `TPT - Server Migration Planning Document.xlsx`
 - No Git installation, clone, or GitHub connection is required on the server
 
-Install ImportExcel once if it is not already present:
+ImportExcel 7.8.10 is installed automatically for the current user when missing. The bootstrap:
 
-```powershell
-Install-Module ImportExcel -Scope CurrentUser
-```
+1. Enables TLS 1.2 for the current PowerShell process.
+2. Installs the NuGet package provider when missing.
+3. Registers the default PSGallery repository when missing.
+4. Temporarily marks PSGallery trusted to prevent an interactive prompt.
+5. Installs the pinned ImportExcel version.
+6. Restores the repository's previous trust policy.
 
-The discovery script will never run this installation command automatically.
+This requires outbound HTTPS access. It does not connect to GitHub.
 
 ## First test
 
@@ -56,7 +59,7 @@ The script finds the workbook beside itself and writes the result directly to `C
 C:\Temp\SERVERNAME-ServerDiscovery-yyyyMMdd-HHmmss.xlsx
 ```
 
-No Git client, repository clone, GitHub sign-in, or outbound GitHub connection is used by the script.
+No Git client, repository clone, GitHub sign-in, or outbound GitHub connection is used by the script. On the first run, it connects to PowerShell Gallery/NuGet only when ImportExcel 7.8.10 is not already installed.
 
 A different template or output location can still be supplied explicitly:
 
@@ -123,7 +126,7 @@ The earlier discovery scripts remain unchanged for comparison. Phase 1 consolida
 
 - AD-wide discovery and repeated remote sessions are deferred.
 - `Win32_Product` application inventory is replaced with uninstall-registry enumeration.
-- Automatic module installation is replaced with a prerequisite check.
+- The missing ImportExcel dependency is bootstrapped from PSGallery at the pinned version 7.8.10.
 - Wide application columns are retained for compatibility, with a normalized Application Inventory sheet added.
 - Collector-level error handling replaces all-or-nothing execution.
 - `Export-Excel -Show` is not used, allowing headless execution.
