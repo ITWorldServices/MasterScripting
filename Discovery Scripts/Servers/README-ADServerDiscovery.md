@@ -54,6 +54,9 @@ Useful options:
 # Supply alternate credentials and adjust parallelism
 $credential=Get-Credential
 .\Invoke-ADServerDiscovery.ps1 -Credential $credential -ThrottleLimit 12
+
+# Allow up to 90 seconds for legacy WMI collection
+.\Invoke-ADServerDiscovery.ps1 -LegacyTimeoutSeconds 90
 ```
 
 ## Collection rules
@@ -103,6 +106,12 @@ Listening ports and expanded share/NTFS permissions are not reliably available
 through the legacy interfaces and are recorded as skipped or limited in
 `Diagnostics`. Role-specific AD, DHCP, and DNS discovery remains on the modern
 collector.
+
+Legacy attempts run as background jobs in parallel. The default 60-second
+timeout applies to the complete legacy collection phase, not to each individual
+WMI query. A target that exceeds the timeout is stopped, marked unavailable,
+and does not prevent the workbook from being created. Use
+`-LegacyTimeoutSeconds` to adjust the limit between 15 and 900 seconds.
 
 ## Failures and unavailable servers
 
