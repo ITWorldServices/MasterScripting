@@ -486,34 +486,42 @@ try {
     }
     Set-TemplateRow $book.Worksheets['Server Info'] 1 2 $serverValues
 
+    $roleSheet=$book.Worksheets['Server Roles']
     $roleMap=[ordered]@{
       'ADCS'='AD-Certificate';'ADDS'='AD-Domain-Services';'ADFS'='ADFS-Federation';'ADLDS'='ADLDS';'ADRMS'='ADRMS'
       'Application Server'='Application-Server';'DHCP'='DHCP';'DNS'='DNS';'Fax Server'='Fax';'File Server'='FS-FileServer'
       'File Resource Manager'='FS-Resource-Manager';'Data Deduplication'='FS-Data-Deduplication';'DFS Namespaces'='FS-DFS-Namespace'
       'DFS Replication'='FS-DFS-Replication';'iSCSI Target Server'='FS-iSCSITarget-Server';'Storage Services'='Storage-Services'
-      'Hyper-V'='Hyper-V';'NPS'='NPAS';'Print Server'='Print-Server';'Remote Access'='RemoteAccess'
-      'RDS'='Remote-Desktop-Services';'RDS Connection Broker'='RDS-Connection-Broker';'RDS Gateway'='RDS-Gateway'
-      'RDS Licensing'='RDS-Licensing';'RDS Session Host'='RDS-RD-Server';'RDS Virtualization Host'='RDS-Virtualization'
-      'RDS Web Access'='RDS-Web-Access';'Volume Activation Services'='VolumeActivation';'Web Server (IIS)'='Web-Server'
-      'Web Server Management Tools'='Web-Mgmt-Tools';'WDS'='WDS';'WSUS'='UpdateServices'
+      'Hyper-V'='Hyper-V';'NPS'='NPAS';'Print Server'='Print-Server';'Distributed Scan'='Print-Scan-Server'
+      'Remote Access'='RemoteAccess';'RDS'='Remote-Desktop-Services';'RDS Connection Broker'='RDS-Connection-Broker'
+      'RDS Gateway'='RDS-Gateway';'RDS Licensing'='RDS-Licensing';'RDS Session Host'='RDS-RD-Server'
+      'RDS Virtualization Host'='RDS-Virtualization';'RDS Web Access'='RDS-Web-Access';'Volume Activation Services'='VolumeActivation'
+      'Web Server (IIS)'='Web-Server';'Web Server Management Tools'='Web-Mgmt-Tools';'WDS'='WDS';'WSUS'='UpdateServices'
+      'Windows Server Essentials Experience'='ServerEssentialsRole'
     }
-    $rv=@{'Server Name'=$ComputerName};foreach($e in $roleMap.GetEnumerator()){$rv[$e.Key]=if($features.Name -contains $e.Value){'Yes'}else{'No'}}
-    Set-TemplateRow $book.Worksheets['Server Roles'] 1 2 $rv
+    $rv=New-YesNoTemplateRow $roleSheet 1
+    foreach($e in $roleMap.GetEnumerator()){$rv[$e.Key]=if($features.Name -contains $e.Value){'Yes'}else{'No'}}
+    Set-TemplateRow $roleSheet 1 2 $rv
 
+    $featureSheet=$book.Worksheets['Server Features']
     $featureMap=[ordered]@{
       '.NET Framework 3.5 Features'='NET-Framework-Features';'.NET Framework 4.5/4.6/4.7 Features'='NET-Framework-45-Features'
-      'BITS'='BITS';'BitLocker Drive Encryption'='BitLocker';'Failover Clustering'='Failover-Clustering';'Group Policy Management'='GPMC'
-      'IPAM'='IPAM';'Media Foundation'='Server-Media-Foundation';'Remote Assistance'='Remote-Assistance';'Message Queuing'='MSMQ'
-      'Remote Differential Compression'='RDC';'Multipath I/O'='Multipath-IO';'Network Load Balancing'='NLB';'RSAT'='RSAT'
-      'SMB 1.0 / CIFS File Sharing Support'='FS-SMB1';'SMTP Server'='SMTP-Server';'SNMP Service'='SNMP-Service'
-      'Telnet Client'='Telnet-Client';'TFTP Client'='TFTP-Client';'Windows Defender Features'='Windows-Defender'
+      'ASP.NET 4.7'='NET-Framework-45-ASPNET';'Web Server Tools'='Web-Mgmt-Tools';'Windows Communication Foundation'='NET-WCF-Services45'
+      'BITS'='BITS';'BitLocker Drive Encryption'='BitLocker';'Enhanced Storage'='EnhancedStorage';'Failover Clustering'='Failover-Clustering'
+      'Group Policy Management'='GPMC';'I/O Quality of Service'='DiskIo-QoS';'IIS Hostable Web Core'='Web-WHC'
+      'Ink and Handwriting Services'='InkAndHandwritingServices';'IPAM'='IPAM';'Media Foundation'='Server-Media-Foundation'
+      'Remote Assistance'='Remote-Assistance';'Message Queuing'='MSMQ';'Remote Differential Compression'='RDC'
+      'Multipath I/O'='Multipath-IO';'Network Load Balancing'='NLB';'RSAT'='RSAT';'RPC over HTTP Proxy'='RPC-over-HTTP-Proxy'
+      'RDS Tools'='RSAT-RDS-Tools';'SMB 1.0 / CIFS File Sharing Support'='FS-SMB1';'SMTP Server'='SMTP-Server'
+      'SNMP Service'='SNMP-Service';'System Data Archiver'='System-DataArchiver';'Telnet Client'='Telnet-Client';'TFTP Client'='TFTP-Client'
+      'Windows Defender Features'='Windows-Defender';'Windows Identity Foundation 3.5'='Windows-Identity-Foundation'
       'Windows Internal Database'='Windows-Internal-Database';'Windows PowerShell'='PowerShellRoot'
-      'Windows Process Activation Service'='WAS';'Windows Search Services'='Search-Service'
-      'Windows Server Backup'='Windows-Server-Backup';'Windows Server Migration Tools'='Migration';'WINS Server'='WINS'
-      'WoW64 Support'='WoW64-Support';'XPS Viewer'='XPS-Viewer'
+      'Windows Process Activation Service'='WAS';'Windows Search Services'='Search-Service';'Windows Server Backup'='Windows-Server-Backup'
+      'Windows Server Migration Tools'='Migration';'WINS Server'='WINS';'WoW64 Support'='WoW64-Support';'XPS Viewer'='XPS-Viewer'
     }
-    $fv=@{'Server Name'=$ComputerName};foreach($e in $featureMap.GetEnumerator()){$fv[$e.Key]=if($features.Name -contains $e.Value){'Yes'}else{'No'}}
-    Set-TemplateRow $book.Worksheets['Server Features'] 1 2 $fv
+    $fv=New-YesNoTemplateRow $featureSheet 1
+    foreach($e in $featureMap.GetEnumerator()){$fv[$e.Key]=if($features.Name -contains $e.Value){'Yes'}else{'No'}}
+    Set-TemplateRow $featureSheet 1 2 $fv
 
     $software=Join-Unique @($applications.Name+$services.Name+$services.DisplayName) ([Environment]::NewLine)
     $azurePatterns=[ordered]@{
