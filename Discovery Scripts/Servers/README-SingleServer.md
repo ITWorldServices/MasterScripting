@@ -24,8 +24,8 @@ Run the first test during a normal maintenance window. The collection is read-on
 - Windows PowerShell 5.1 or PowerShell 7 on Windows
 - Local administrator is recommended
 - ImportExcel PowerShell module
-- The repository workbook at:
-  `TPT - Server Migration Planning Document.xlsx`
+- The workbook template `TPT - Server Migration Planning Document.xlsx`
+- No Git installation, clone, or GitHub connection is required on the server
 
 Install ImportExcel once if it is not already present:
 
@@ -37,26 +37,31 @@ The discovery script will never run this installation command automatically.
 
 ## First test
 
-1. Download or clone the feature branch.
-2. Open an elevated PowerShell session.
-3. Change to `Discovery Scripts\Servers`.
+1. Download these two files from GitHub on your administrative workstation:
+   - `Invoke-ServerDiscovery.ps1`
+   - `TPT - Server Migration Planning Document.xlsx`
+2. Transfer both files to `C:\Temp` on the test server using your approved method.
+3. Open an elevated PowerShell session on the server.
 4. Run:
 
 ```powershell
+Set-Location C:\Temp
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\Invoke-ServerDiscovery.ps1
 ```
 
-To place the result in a specific folder:
-
-```powershell
-.\Invoke-ServerDiscovery.ps1 -OutputDirectory C:\Temp\ServerDiscovery
-```
-
-The default result is written below `Discovery Scripts\Servers\Output` as:
+The script finds the workbook beside itself and writes the result directly to `C:\Temp`:
 
 ```text
-SERVERNAME-ServerDiscovery-yyyyMMdd-HHmmss.xlsx
+C:\Temp\SERVERNAME-ServerDiscovery-yyyyMMdd-HHmmss.xlsx
+```
+
+No Git client, repository clone, GitHub sign-in, or outbound GitHub connection is used by the script.
+
+A different template or output location can still be supplied explicitly:
+
+```powershell
+.\Invoke-ServerDiscovery.ps1 -TemplatePath D:\Templates\Planning.xlsx -OutputDirectory D:\Discovery
 ```
 
 ## What Phase 1 collects
