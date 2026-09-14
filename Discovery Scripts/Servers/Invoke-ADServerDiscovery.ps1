@@ -165,7 +165,10 @@ Import-Module ActiveDirectory -ErrorAction Stop
 Initialize-ImportExcel
 
 $collectorPath=Join-Path $PSScriptRoot 'Get-ServerDiscoveryData.ps1'
+$legacyCollectorPath=Join-Path $PSScriptRoot 'Get-LegacyServerDiscoveryData.ps1'
 if(-not(Test-Path -LiteralPath $collectorPath)){throw ('Remote collector was not found: {0}' -f $collectorPath)}
+if(-not(Test-Path -LiteralPath $legacyCollectorPath)){throw ('Legacy collector was not found: {0}' -f $legacyCollectorPath)}
+. $legacyCollectorPath
 if(-not(Test-Path -LiteralPath $OutputDirectory)){New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null}
 
 $adParameters=@{
@@ -195,6 +198,30 @@ $invokeParameters=@{
 if($Credential){$invokeParameters.Credential=$Credential}
 $payloads=@(Invoke-Command @invokeParameters | Where-Object {$_.PSObject.Properties['Metadata'] -and $_.PSObject.Properties['System']})
 
+# Server 2003/2008 may not support the modern PowerShell collector. Retry those
+# systems from the initiating server using WMI/DCOM and return the same payload
+# contract used by the workbook writer.
+$legacyErrors=@{}
+$legacyCandidates=@($adComputers | Where-Object {$_.OperatingSystem -match 'Windows Server (2003|2008)'})
+foreach($computer in $legacyCandidates){
+    $target=if($computer.DNSHostName){$computer.DNSHostName}else{$computer.Name}
+    $existing=$payloads | Where-Object {
+        $_.PSComputerName -eq $target -or $_.Metadata.ComputerName -eq $computer.Name
+    } | Select-Object -First 1
+    if($existing){continue}
+    Write-Host ('Trying legacy WMI/DCOM collection for {0}...' -f $computer.Name) -ForegroundColor Yellow
+    try{
+        $legacyParameters=@{ComputerName=$target}
+        if($Credential){$legacyParameters.Credential=$Credential}
+        $legacyPayload=Get-LegacyServerDiscoveryData @legacyParameters
+        $legacyPayload | Add-Member NoteProperty PSComputerName $target -Force
+        $payloads+=@($legacyPayload)
+    }catch{
+        $legacyErrors[$target.ToLowerInvariant()]=$_.Exception.Message
+        $legacyErrors[$computer.Name.ToLowerInvariant()]=$_.Exception.Message
+    }
+}
+
 $payloadByTarget=@{}
 foreach($payload in $payloads){
     $key=[string]$payload.PSComputerName
@@ -204,8 +231,14 @@ foreach($payload in $payloads){
 $errorByTarget=@{}
 foreach($remoteError in @($remoteErrors)){
     $errorTarget=[string]$remoteError.OriginInfo.PSComputerName
+    if([string]::IsNullOrWhiteSpace($errorTarget)){$errorTarget=[string]$remoteError.CategoryInfo.TargetName}
     if([string]::IsNullOrWhiteSpace($errorTarget)){$errorTarget='Unknown'}
-    $errorByTarget[$errorTarget.ToLowerInvariant()]=[string]$remoteError.Exception.Message
+    $errorKeys=@($errorTarget.ToLowerInvariant())
+    if($errorTarget.Contains('.')){$errorKeys+=@($errorTarget.Split('.')[0].ToLowerInvariant())}
+    foreach($errorKey in $errorKeys){
+        $existingMessage=$errorByTarget[$errorKey]
+        $errorByTarget[$errorKey]=Join-UniqueValue @($existingMessage,[string]$remoteError.Exception.Message)
+    }
 }
 
 $serverSummary=@()
@@ -218,13 +251,19 @@ foreach($computer in $adComputers){
     }
     if($payload){
         $failed=@($payload.Diagnostics | Where-Object Status -eq Failed)
-        $inventoryStatus=if($failed.Count){'Completed with collector failures'}else{'Complete'}
+        $warnings=@($payload.Diagnostics | Where-Object Status -eq Warning)
+        $inventoryStatus=if($failed.Count){'Completed with collector failures'}elseif($warnings.Count){'Completed with warnings'}else{'Complete'}
         Add-OrchestratorDiagnostic $computer.Name Success ('Remote collection completed as {0}.' -f $payload.Metadata.CollectionMode)
         $errorMessage=Join-UniqueValue $failed.Message
         $meta=$payload.Metadata
     }else{
         $inventoryStatus='Unavailable'
-        $errorMessage=$errorByTarget[$key]
+        $errorMessage=Join-UniqueValue @(
+            $legacyErrors[$key]
+            $legacyErrors[$computer.Name.ToLowerInvariant()]
+            $errorByTarget[$key]
+            $errorByTarget[$computer.Name.ToLowerInvariant()]
+        )
         if([string]::IsNullOrWhiteSpace($errorMessage)){$errorMessage='No inventory payload was returned. Verify DNS, WinRM, firewall, and administrative access.'}
         Add-OrchestratorDiagnostic $computer.Name Failed $errorMessage
         $meta=$null
@@ -290,10 +329,12 @@ try{
 }
 
 $unavailable=@($serverSummary | Where-Object InventoryStatus -eq Unavailable).Count
+$legacyCompleted=@($serverSummary | Where-Object CollectionMode -eq 'Legacy basic only').Count
 $collectorFailures=@($diagnostics | Where-Object Status -eq Failed).Count
 Write-Host ''
 Write-Host 'AD-wide server discovery completed.' -ForegroundColor Green
 Write-Host ('Servers targeted: {0}' -f $serverSummary.Count)
+Write-Host ('Servers collected through legacy WMI: {0}' -f $legacyCompleted)
 Write-Host ('Servers unavailable: {0}' -f $unavailable)
 Write-Host ('Collector failures: {0}' -f $collectorFailures)
 Write-Host ('Output: {0}' -f $outputPath)
