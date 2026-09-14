@@ -144,13 +144,13 @@ function Add-DataSheet {
         return
     }
     $headers=@($data[0].PSObject.Properties.Name)
-    for($column=0;$column -lt $headers.Count;$column++){$sheet.Cells[1,$column+1].Value=$headers[$column]}
+    for($column=0;$column -lt $headers.Count;$column++){$sheet.Cells[1,($column+1)].Value=$headers[$column]}
     for($row=0;$row -lt $data.Count;$row++){
         for($column=0;$column -lt $headers.Count;$column++){
             $propertyName=$headers[$column]
             $property=$data[$row].PSObject.Properties[$propertyName]
             $value=Convert-ToCellValue $(if($property){$property.Value}else{$null})
-            $cell=$sheet.Cells[$row+2,$column+1]
+            $cell=$sheet.Cells[($row+2),($column+1)]
             $cell.Value=$value
             if($value -is [datetime]){$cell.Style.Numberformat.Format='yyyy-mm-dd HH:mm:ss'}
             elseif($propertyName -match 'Percent|Utilization|SizeGB|FreeGB|MemoryGB'){$cell.Style.Numberformat.Format='0.00'}
