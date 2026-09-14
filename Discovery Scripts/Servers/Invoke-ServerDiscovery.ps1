@@ -550,13 +550,22 @@ try {
     Set-TemplateRow $azureSheet 1 2 $av
 
     $lob=$book.Worksheets['LoB Applications']
-    if($lob){$lob.Cells[2,1].Value=$ComputerName;for($i=0;$i -lt [math]::Min($applications.Count,$lob.Dimension.End.Column-1);$i++){$lob.Cells[2,($i+2)].Value=$applications[$i].Name}}
+    if($lob){
+        Clear-TemplateValues $lob 'B2:BO2'
+        $lob.Cells[2,1].Value=$ComputerName
+        for($i=0;$i -lt [math]::Min($applications.Count,$lob.Dimension.End.Column-1);$i++){
+            $lob.Cells[2,($i+2)].Value=$applications[$i].Name
+        }
+    }
 
     $shareSheet=$book.Worksheets['File Server Shares']
     $securitySheet=$book.Worksheets['File Server Security']
+    Clear-TemplateValues $shareSheet 'A3:G65'
+    Clear-TemplateValues $securitySheet 'A2:G39'
     for($i=0;$i -lt $shares.Count;$i++){
         if($shareSheet){
             $r=$i+3;$shareSheet.Cells[$r,1].Value=$ComputerName;$shareSheet.Cells[$r,2].Value=$shares[$i].Path
+            $shareSheet.Cells[$r,3].Value=$(if($shares[$i].Path -match '^[A-Za-z]:'){$shares[$i].Path.Substring(0,2)}else{$null})
             $shareSheet.Cells[$r,5].Value=$shares[$i].Name;$shareSheet.Cells[$r,6].Value=$shares[$i].UNCPath;$shareSheet.Cells[$r,7].Value=$shares[$i].Path
         }
         if($securitySheet){
@@ -566,32 +575,122 @@ try {
         }
     }
 
+    $printerSheet=$book.Worksheets['Printers Shares']
+    if($printerSheet){
+        Clear-TemplateValues $printerSheet 'A3:B100'
+        $printerSheet.Cells[1,2].Value=$ComputerName
+        for($i=0;$i -lt $printers.Count;$i++){
+            $r=$i+3
+            $printerSheet.Cells[$r,1].Value=$(if($printers[$i].ShareName){$printers[$i].ShareName}else{$printers[$i].Name})
+            $printerSheet.Cells[$r,2].Value=$printers[$i].PortName
+        }
+    }
+
     $taskSheet=$book.Worksheets['Scheduled Tasks']
+    Clear-TemplateValues $taskSheet 'A2:E38'
     for($i=0;$taskSheet -and $i -lt $tasks.Count;$i++){
         $r=$i+2;$taskSheet.Cells[$r,1].Value=$tasks[$i].Name;$taskSheet.Cells[$r,2].Value=$ComputerName
         $taskSheet.Cells[$r,3].Value=$tasks[$i].Location;$taskSheet.Cells[$r,4].Value=$tasks[$i].Executable
         $taskSheet.Cells[$r,5].Value=$tasks[$i].Description
     }
 
+    $accountSheet=$book.Worksheets['Accounts and Groups']
+    if($accountSheet){
+        Clear-TemplateValues $accountSheet 'A2:B4'
+        Clear-TemplateValues $accountSheet 'A8:B10'
+        Clear-TemplateValues $accountSheet 'A14:D16'
+        for($i=0;$i -lt [math]::Min($accounts.Count,3);$i++){
+            $accountSheet.Cells[$i+2,1].Value=$accounts[$i].Name
+        }
+        if($adUsers.Count){
+            $accountSheet.Cells[8,1].Value=('{0} domain accounts; see User Accounts' -f $adUsers.Count)
+            $accountSheet.Cells[8,2].Value='See SecurityGroups for memberships'
+        }
+        for($i=0;$i -lt [math]::Min($serviceAccounts.Count,3);$i++){
+            $accountSheet.Cells[$i+14,1].Value=$serviceAccounts[$i].Account
+            $accountSheet.Cells[$i+14,2].Value=$serviceAccounts[$i].Usage
+            $accountSheet.Cells[$i+14,3].Value=$serviceAccounts[$i].InteractiveLoginRequired
+            $accountSheet.Cells[$i+14,4].Value=$serviceAccounts[$i].ManagedServiceAccount
+        }
+    }
+
     if($dc.Count){
         $ad=$book.Worksheets['Active Directory'];$d=$dc[0]
         if($ad){
-            $ad.Cells[4,1].Value=$d.FQDN;$ad.Cells[4,2].Value=$d.OperatingSystem;$ad.Cells[4,3].Value='Online'
-            $ad.Cells[4,4].Value=if($d.GlobalCatalog){'Yes'}else{'No'};$ad.Cells[4,5].Value=$d.Site;$ad.Cells[4,6].Value=if($d.ReadOnly){'Yes'}else{'No'}
-            $ad.Cells[13,1].Value=$d.PDC;$ad.Cells[13,2].Value=$d.SchemaMaster;$ad.Cells[13,3].Value=$d.NamingMaster
-            $ad.Cells[13,4].Value=$d.RIDMaster;$ad.Cells[13,5].Value=$d.InfrastructureMaster
-            $ad.Cells[21,1].Value=$d.ForestMode;$ad.Cells[21,2].Value=$d.DomainMode
+            $ad.Cells[2,2].Value=('Domain FQDN: {0}' -f $d.DomainFQDN)
+            $ad.Cells[2,4].Value=('Domain Shortname: {0}' -f $d.DomainShortName)
+            $ad.Cells[2,6].Value=('Additional UPN: {0}' -f $d.UPNSuffixes)
+            $ad.Cells[4,2].Value=$d.FQDN;$ad.Cells[4,3].Value=$d.OperatingSystem;$ad.Cells[4,4].Value='Online'
+            $ad.Cells[4,5].Value=if($d.GlobalCatalog){'Yes'}else{'No'};$ad.Cells[4,6].Value=$d.Site
+            $ad.Cells[4,7].Value=if($d.ReadOnly){'Yes'}else{'No'};$ad.Cells[4,8].Value=if($features.Name -contains 'DHCP'){'Yes'}else{'No'}
+            $ad.Cells[13,2].Value=$d.FQDN;$ad.Cells[13,3].Value=if($d.PDC -eq $d.FQDN){'x'}else{''}
+            $ad.Cells[13,4].Value=if($d.SchemaMaster -eq $d.FQDN){'x'}else{''};$ad.Cells[13,5].Value=if($d.NamingMaster -eq $d.FQDN){'x'}else{''}
+            $ad.Cells[13,6].Value=if($d.RIDMaster -eq $d.FQDN){'x'}else{''};$ad.Cells[13,7].Value=if($d.InfrastructureMaster -eq $d.FQDN){'x'}else{''}
+            $ad.Cells[21,2].Value=$d.ForestMode;$ad.Cells[21,3].Value=$d.DomainMode
+            Clear-TemplateValues $ad 'B24:E38'
+            for($i=0;$i -lt [math]::Min($adReplication.Count,15);$i++){
+                $r=$i+24;$ad.Cells[$r,2].Value=$adReplication[$i].FromServer;$ad.Cells[$r,3].Value=$adReplication[$i].ToServer
+                $ad.Cells[$r,4].Value=$adReplication[$i].LastSync;$ad.Cells[$r,4].Style.Numberformat.Format='yyyy-mm-dd HH:mm:ss'
+                $ad.Cells[$r,5].Value=$adReplication[$i].Status
+            }
+            $ad.Cells[41,2].Value=$d.FQDN
+            $ad.Cells[41,3].Value=if($services.Name -contains 'ADSync'){'Configured'}else{'Not detected'}
         }
     }
 
     $dhcpSheet=$book.Worksheets['DHCP']
+    Clear-TemplateValues $dhcpSheet 'A4:P9'
     for($i=0;$dhcpSheet -and $i -lt $dhcp.Count;$i++){
-        $s=$dhcp[$i];$vals=@{
+        $s=$dhcp[$i];$optionValues=@($s.ScopeOptions)
+        $vals=@{
           'Server Name'=$ComputerName;'Scope Name'=$s.ScopeName;'Status'=$s.Status
-          'Scope'=('{0} - {1}' -f $s.StartRange,$s.EndRange);'Address Pool'=('{0} / {1}' -f $s.ScopeId,$s.SubnetMask)
-          'Scope Utilization'=$s.Utilization;'Lease Duration'=$s.LeaseDuration
+          'Scope'=('{0} / {1}' -f $s.ScopeId,$s.SubnetMask);'Address Pool'=$s.AddressPool
+          'Exclusions'=$s.Exclusions;'Reservations'=$s.Reservations
+          'Scope Utilization'=$s.Utilization;'Lease Duration'=$s.LeaseDuration;'NAP'=$s.NAP;'Failover'=$s.Failover
+        }
+        for($optionIndex=0;$optionIndex -lt [math]::Min($optionValues.Count,5);$optionIndex++){
+            $vals['Scope Options{0}' -f ($optionIndex+1)]=$optionValues[$optionIndex]
         }
         Set-TemplateRow $dhcpSheet 3 ($i+4) $vals
+    }
+
+    $dnsSheet=$book.Worksheets['DNS']
+    if($dnsSheet){
+        Clear-TemplateValues $dnsSheet 'B4:C13'
+        Clear-TemplateValues $dnsSheet 'E4:H13'
+        Clear-TemplateValues $dnsSheet 'E16:H31'
+        $dnsSheet.Cells[4,2].Value=$(if($dc.Count){$dc[0].FQDN}else{$ComputerName})
+        $dnsSheet.Cells[4,3].Value='Online'
+        $forward=@($dns|Where-Object{-not $_.IsReverseLookupZone})
+        $reverse=@($dns|Where-Object{$_.IsReverseLookupZone})
+        for($i=0;$i -lt [math]::Min($forward.Count,10);$i++){
+            $r=$i+4;$dnsSheet.Cells[$r,5].Value=$forward[$i].ZoneName;$dnsSheet.Cells[$r,6].Value=$forward[$i].ZoneType
+            $dnsSheet.Cells[$r,7].Value='Loaded';$dnsSheet.Cells[$r,8].Value='Not collected'
+        }
+        for($i=0;$i -lt [math]::Min($reverse.Count,16);$i++){
+            $r=$i+16;$dnsSheet.Cells[$r,5].Value=$reverse[$i].ZoneName;$dnsSheet.Cells[$r,6].Value=$reverse[$i].ZoneType
+            $dnsSheet.Cells[$r,7].Value='Loaded';$dnsSheet.Cells[$r,8].Value='Not collected'
+        }
+    }
+
+    $userSheet=$book.Worksheets['User Accounts']
+    if($userSheet){
+        for($i=0;$i -lt $adUsers.Count;$i++){
+            $u=$adUsers[$i];$r=$i+3
+            $values=@($u.FirstName,$u.LastName,$u.DisplayName,$u.SamAccountName,$u.UserPrincipalName,$u.Street,$u.City,$u.State,$u.PostalCode,$u.Country,
+              $u.JobTitle,$u.Department,$u.Company,$u.Manager,$u.Description,$u.Office,$u.Telephone,$u.Email,$u.Mobile,$u.Notes,
+              $(if($u.Enabled){'Enabled'}else{'Disabled'}),$u.LastLogonDate)
+            for($c=0;$c -lt $values.Count;$c++){$userSheet.Cells[$r,($c+1)].Value=$values[$c]}
+            if($u.LastLogonDate){$userSheet.Cells[$r,22].Style.Numberformat.Format='yyyy-mm-dd HH:mm:ss'}
+        }
+    }
+
+    $groupSheet=$book.Worksheets['SecurityGroups']
+    if($groupSheet){
+        for($i=0;$i -lt $adMembership.Count;$i++){
+            $r=$i+3;$groupSheet.Cells[$r,1].Value=$adMembership[$i].Username
+            $groupSheet.Cells[$r,2].Value=$adMembership[$i].Name;$groupSheet.Cells[$r,3].Value=$adMembership[$i].GroupName
+        }
     }
 
     Add-DataSheet $book 'System Inventory' $system
