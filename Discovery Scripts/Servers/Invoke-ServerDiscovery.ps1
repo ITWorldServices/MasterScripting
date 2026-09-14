@@ -93,10 +93,67 @@ function Add-DataSheet {
 }
 
 if ($env:OS -ne 'Windows_NT') { throw 'Run this script on the Windows Server being inventoried.' }
-if (-not (Get-Module -ListAvailable ImportExcel)) {
-    throw 'ImportExcel is required. Install once with: Install-Module ImportExcel -Scope CurrentUser'
+function Initialize-ImportExcel {
+    $requiredVersion = '7.8.10'
+
+    if (Get-Module -ListAvailable -Name ImportExcel |
+        Where-Object { $_.Version -ge [version]$requiredVersion } |
+        Select-Object -First 1) {
+        Import-Module ImportExcel -MinimumVersion $requiredVersion -ErrorAction Stop
+        Add-Diagnostic 'ImportExcel Bootstrap' Success ('ImportExcel {0} or later is already installed.' -f $requiredVersion)
+        return
+    }
+
+    Write-Host ('ImportExcel {0} is not installed. Bootstrapping PowerShell Gallery access...' -f $requiredVersion) -ForegroundColor Yellow
+
+    try {
+        [Net.ServicePointManager]::SecurityProtocol =
+            [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        Add-Diagnostic 'ImportExcel Bootstrap' Success 'TLS 1.2 enabled for this PowerShell process.'
+
+        $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue |
+            Where-Object { $_.Version -ge [version]'2.8.5.201' } |
+            Select-Object -First 1
+
+        if (-not $nuget) {
+            Write-Host 'Installing the NuGet package provider...' -ForegroundColor Yellow
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Confirm:$false | Out-Null
+            Add-Diagnostic 'ImportExcel Bootstrap' Success 'NuGet package provider installed.'
+        }
+
+        $gallery = Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue
+        if (-not $gallery) {
+            Write-Host 'Registering the default PowerShell Gallery repository...' -ForegroundColor Yellow
+            Register-PSRepository -Default -ErrorAction Stop
+            $gallery = Get-PSRepository -Name PSGallery -ErrorAction Stop
+            Add-Diagnostic 'ImportExcel Bootstrap' Success 'PowerShell Gallery repository registered.'
+        }
+
+        $originalPolicy = $gallery.InstallationPolicy
+        if ($originalPolicy -ne 'Trusted') {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop
+        }
+
+        try {
+            Write-Host ('Installing ImportExcel {0} for the current user...' -f $requiredVersion) -ForegroundColor Yellow
+            Install-Module -Name ImportExcel -RequiredVersion $requiredVersion -Repository PSGallery -Scope CurrentUser -Force -AllowClobber -Confirm:$false -ErrorAction Stop
+        }
+        finally {
+            if ($originalPolicy -and $originalPolicy -ne 'Trusted') {
+                Set-PSRepository -Name PSGallery -InstallationPolicy $originalPolicy -ErrorAction SilentlyContinue
+            }
+        }
+
+        Import-Module ImportExcel -RequiredVersion $requiredVersion -Force -ErrorAction Stop
+        Add-Diagnostic 'ImportExcel Bootstrap' Success ('ImportExcel {0} installed and imported.' -f $requiredVersion)
+    }
+    catch {
+        Add-Diagnostic 'ImportExcel Bootstrap' Failed $_.Exception.Message
+        throw ('Unable to install ImportExcel automatically. Confirm HTTPS access to www.powershellgallery.com and the NuGet endpoints, plus any required proxy configuration. Error: {0}' -f $_.Exception.Message)
+    }
 }
-Import-Module ImportExcel -ErrorAction Stop
+
+Initialize-ImportExcel
 if ([string]::IsNullOrWhiteSpace($TemplatePath)) {
     $templateCandidates = @(
         (Join-Path $PSScriptRoot 'TPT - Server Migration Planning Document.xlsx'),
