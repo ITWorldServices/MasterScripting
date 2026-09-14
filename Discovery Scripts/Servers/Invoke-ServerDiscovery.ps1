@@ -458,7 +458,19 @@ $mapped=Invoke-Collector 'Mapped Drives' {
 
 $serviceAccounts=@(
     $services | Where-Object {
-        $_.StartName -and $_.StartName -notmatch '^(LocalSystem|NT AUTHORITY\\|NT SERVICE\\|LocalService|NetworkService)
+        $_.StartName -and $_.StartName -notmatch '^(LocalSystem|LocalService|NetworkService|NT AUTHORITY\\|NT SERVICE\\)'
+    } | ForEach-Object {
+        [pscustomobject][ordered]@{
+            Account=$_.StartName
+            Usage=('Windows service: {0}' -f $_.DisplayName)
+            InteractiveLoginRequired='Unknown'
+            ManagedServiceAccount=$(if($_.StartName.EndsWith('$')){'Yes'}else{'No'})
+        }
+    }
+)
+$serviceAccounts=@($serviceAccounts | Sort-Object Account,Usage -Unique)
+
+$package=$null
 try {
     $package=Open-ExcelPackage -Path $outputPath
     $book=$package.Workbook
