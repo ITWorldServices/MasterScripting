@@ -524,17 +524,27 @@ try {
     Set-TemplateRow $featureSheet 1 2 $fv
 
     $software=Join-Unique @($applications.Name+$services.Name+$services.DisplayName) ([Environment]::NewLine)
+    $azureSheet=$book.Worksheets['Azure Agents-Apps-Services']
     $azurePatterns=[ordered]@{
-      'MMA'='Monitoring Agent|OMS Agent';'Azure Data Studio'='Azure Data Studio';'Azure Powershell'='Azure PowerShell'
-      'On-Premises Data Gateway'='On-premises data gateway';'Azure Backup'='Azure Backup'
-      'Azure Site Recovery Mobility Service'='Site Recovery.*Mobility';'Windows Azure VM Agent'='Azure VM Agent|WindowsAzureGuestAgent|RdAgent'
-      'Azure AD Connect Authentication Agent'='Authentication Agent';'Azure AD Connect'='Azure AD Connect|Entra Connect'
+      'MMA'='Microsoft Monitoring Agent|OMS Agent';'Azure Data Studio'='Azure Data Studio'
+      'Azure Workload Backup'='Azure.*Workload|Microsoft Azure Recovery Services';'Azure Powershell'='Azure PowerShell|Az PowerShell'
+      'UI Flow'='Power Automate|UI flows';'On-Premises Data Gateway'='On-premises data gateway'
+      'Azure Plug-in for Veeam'='Veeam.*Azure|Azure.*Veeam';'Azure Backup'='Azure Backup'
+      'Azure Site Recovery Mobility Service'='Site Recovery.*Mobility|Microsoft Azure Site Recovery'
+      'Windows Azure VM Agent'='Windows Azure VM Agent|WindowsAzureGuestAgent|RdAgent'
+      'Azure AD Connect Authentication Agent'='Azure AD Connect Authentication Agent|Entra Connect Authentication Agent'
+      'Azure AD Connect'='Azure AD Connect|Microsoft Entra Connect';'Citrix Azure Provisioning'='Citrix.*Azure'
+      'Azure Connected Storage Service'='Azure Connected Storage';'Azure Recovery Services'='Azure Recovery Services'
       'Azure Information Protection'='Azure Information Protection';'Azure Advanced Threat Protection Sensor'='Azure ATP|Defender for Identity'
-      'NPS Extension for Azure MFA'='NPS Extension.*Azure MFA';'Storage Sync Agent'='Storage Sync Agent|Azure File Sync'
+      'Azure AD Connect Agent Updater'='Azure AD Connect Agent Updater|Entra Connect Agent Updater'
+      'NPS Extension for Azure MFA'='NPS Extension.*Azure MFA|Azure MFA.*NPS';'Intune Connector dor AD'='Intune Connector.*Active Directory'
+      'Microsoft Azure Active Directory Application Proxy Connector'='Application Proxy Connector'
+      'Storage Sync Agent'='Storage Sync Agent|Azure File Sync'
     }
-    $av=@{'Server Name'=$ComputerName;'Azure VM'=if($sys.Manufacturer -match 'Microsoft' -and $sys.Model -match 'Virtual'){'Yes'}else{'No'}}
+    $av=New-YesNoTemplateRow $azureSheet 1
+    $av['Azure VM']=if($sys.Manufacturer -match 'Microsoft' -and $sys.Model -match 'Virtual'){'Yes'}else{'No'}
     foreach($e in $azurePatterns.GetEnumerator()){$av[$e.Key]=if($software -match $e.Value){'Yes'}else{'No'}}
-    Set-TemplateRow $book.Worksheets['Azure Agents-Apps-Services'] 1 2 $av
+    Set-TemplateRow $azureSheet 1 2 $av
 
     $lob=$book.Worksheets['LoB Applications']
     if($lob){$lob.Cells[2,1].Value=$ComputerName;for($i=0;$i -lt [math]::Min($applications.Count,$lob.Dimension.End.Column-1);$i++){$lob.Cells[2,($i+2)].Value=$applications[$i].Name}}
