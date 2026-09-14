@@ -23,6 +23,7 @@ param(
     [ValidateRange(1,64)][int]$ThrottleLimit=8,
     [ValidateRange(5,300)][int]$ConnectionTimeoutSeconds=30,
     [ValidateRange(30,3600)][int]$OperationTimeoutSeconds=600,
+    [ValidateRange(15,900)][int]$LegacyTimeoutSeconds=60,
     [pscredential]$Credential,
     [switch]$IncludeMicrosoftTasks,
     [string]$OutputDirectory='C:\Temp'
@@ -203,6 +204,7 @@ $payloads=@(Invoke-Command @invokeParameters | Where-Object {$_.PSObject.Propert
 # contract used by the workbook writer.
 $legacyErrors=@{}
 $legacyCandidates=@($adComputers | Where-Object {$_.OperatingSystem -match 'Windows Server (2003|2008)'})
+$legacyJobs=@()
 foreach($computer in $legacyCandidates){
     $target=if($computer.DNSHostName){$computer.DNSHostName}else{$computer.Name}
     $existing=$payloads | Where-Object {
@@ -210,15 +212,50 @@ foreach($computer in $legacyCandidates){
     } | Select-Object -First 1
     if($existing){continue}
     Write-Host ('Trying legacy WMI/DCOM collection for {0}...' -f $computer.Name) -ForegroundColor Yellow
-    try{
-        $legacyParameters=@{ComputerName=$target}
-        if($Credential){$legacyParameters.Credential=$Credential}
-        $legacyPayload=Get-LegacyServerDiscoveryData @legacyParameters
-        $legacyPayload | Add-Member NoteProperty PSComputerName $target -Force
-        $payloads+=@($legacyPayload)
-    }catch{
-        $legacyErrors[$target.ToLowerInvariant()]=$_.Exception.Message
-        $legacyErrors[$computer.Name.ToLowerInvariant()]=$_.Exception.Message
+    $job=Start-Job -ScriptBlock {
+        param($LegacyCollectorPath,$TargetComputer,$LegacyCredential)
+        . $LegacyCollectorPath
+        $parameters=@{ComputerName=$TargetComputer}
+        if($LegacyCredential){$parameters.Credential=$LegacyCredential}
+        Get-LegacyServerDiscoveryData @parameters
+    } -ArgumentList $legacyCollectorPath,$target,$Credential
+    $legacyJobs+=@([pscustomobject]@{
+        Job=$job
+        Computer=$computer
+        Target=$target
+    })
+}
+
+if($legacyJobs.Count){
+    $null=Wait-Job -Job @($legacyJobs.Job) -Timeout $LegacyTimeoutSeconds
+    foreach($legacyJob in $legacyJobs){
+        $job=$legacyJob.Job
+        $computer=$legacyJob.Computer
+        $target=$legacyJob.Target
+        try{
+            if($job.State -eq 'Completed'){
+                $legacyPayload=@(Receive-Job -Job $job -ErrorAction Stop | Where-Object {
+                    $_.PSObject.Properties['Metadata'] -and $_.PSObject.Properties['System']
+                }) | Select-Object -First 1
+                if(-not $legacyPayload){throw 'Legacy collection completed without returning an inventory payload.'}
+                $legacyPayload | Add-Member NoteProperty PSComputerName $target -Force
+                $payloads+=@($legacyPayload)
+            }elseif($job.State -eq 'Failed'){
+                $reason=$job.ChildJobs[0].JobStateInfo.Reason
+                if($reason){throw $reason}
+                throw 'The legacy collection background job failed.'
+            }else{
+                throw ('Legacy WMI/DCOM collection exceeded the {0}-second timeout.' -f $LegacyTimeoutSeconds)
+            }
+        }catch{
+            $legacyErrors[$target.ToLowerInvariant()]=$_.Exception.Message
+            $legacyErrors[$computer.Name.ToLowerInvariant()]=$_.Exception.Message
+        }finally{
+            if($job.State -notin 'Completed','Failed','Stopped'){
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+            }
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
