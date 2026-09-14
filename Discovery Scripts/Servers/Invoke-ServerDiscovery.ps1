@@ -720,6 +720,10 @@ try {
     Add-DataSheet $book 'Domain Controller Inventory' $dc
     Add-DataSheet $book 'DHCP Scope Inventory' $dhcp
     Add-DataSheet $book 'DNS Zone Inventory' $dns
+    Add-DataSheet $book 'AD User Inventory' $adUsers
+    Add-DataSheet $book 'AD Group Membership' $adMembership
+    Add-DataSheet $book 'AD Replication' $adReplication
+    Add-DataSheet $book 'Service Account Usage' $serviceAccounts
     Add-DataSheet $book 'Diagnostics' $script:Diagnostics
     Close-ExcelPackage -ExcelPackage $package
     $package=$null
