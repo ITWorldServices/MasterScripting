@@ -95,11 +95,15 @@ The workbook preserves the required discovery data without duplicating it across
 | AD Users | Domain user identity, contact, organizational, status, logon, and service-account indicators |
 | AD Group Membership | Direct and primary group membership by user |
 | AD Replication | Replication partners, last successful replication, and status |
-| DHCP Scopes | Scope ranges, exclusions, reservations, options, lease, utilization, NAP, and failover |
+| DHCP Scopes | Scope ranges, lease duration, utilization, and NAP status |
+| DHCP Exclusions | Excluded address ranges by scope |
+| DHCP Reservations | Reserved addresses, client IDs, names, descriptions, and types |
+| DHCP Options | Option IDs, names, values, classes, and policies by scope |
+| DHCP Failover | Configured failover relationships and participating scopes |
 | DNS Zones | Forward and reverse zone properties |
 | Diagnostics | Collector result, record count, warning/error message, and timestamp |
 
-Sheets that return no records remain present and clearly state `No records returned.` This distinguishes an empty result from an omitted data category.
+Sheets that return no records remain present and clearly state `No records returned.` This distinguishes an empty result from an omitted data category. A DHCP server with no failover relationship therefore produces an empty `DHCP Failover` sheet without displaying an error.
 
 ## Intentionally manual or deferred
 
