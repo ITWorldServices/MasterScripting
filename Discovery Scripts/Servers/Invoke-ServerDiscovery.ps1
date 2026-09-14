@@ -1,13 +1,14 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-Collects discovery data from the local Windows Server and writes a timestamped
-copy of the TPT Server Migration Planning workbook.
+Collects discovery data from the local Windows Server and writes a clean,
+timestamped Excel discovery workbook.
 
 .DESCRIPTION
-Phase 1 is local-only. It does not enumerate AD computers, use remoting, install
-modules, call Win32_Product, or recursively scan file shares. Each collector is
-isolated; failures are recorded on the Diagnostics worksheet.
+Phase 1 is local-only. It does not enumerate AD computers, use remoting, call
+Win32_Product, or recursively scan file shares. It installs ImportExcel when
+required. Each collector is isolated; failures are recorded on Diagnostics.
+The workbook is generated from the collected data; a legacy template is optional.
 #>
 [CmdletBinding()]
 param(
@@ -57,61 +58,85 @@ function Convert-PrefixToMask {
     }) -join '.')
 }
 
-function Set-TemplateRow {
-    param($Worksheet,[int]$HeaderRow,[int]$DataRow,[hashtable]$Values)
+function Convert-ToCellValue {
+    param($Value)
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [bool]) { return $(if ($Value) { 'Yes' } else { 'No' }) }
+    if ($Value -is [array]) { return (Join-Unique $Value) }
+    return $Value
+}
+
+function Set-WorksheetStyle {
+    param($Worksheet,[int]$HeaderRow = 1)
     if (-not $Worksheet -or -not $Worksheet.Dimension) { return }
-    for ($column=1; $column -le $Worksheet.Dimension.End.Column; $column++) {
-        $header = ([string]$Worksheet.Cells[$HeaderRow,$column].Text).Trim()
-        if ($header -and $Values.ContainsKey($header)) {
-            $Worksheet.Cells[$DataRow,$column].Value = $Values[$header]
+
+    $lastRow=$Worksheet.Dimension.End.Row
+    $lastColumn=$Worksheet.Dimension.End.Column
+    $header=$Worksheet.Cells[$HeaderRow,1,$HeaderRow,$lastColumn]
+    $header.Style.Font.Bold=$true
+    $header.Style.Font.Color.SetColor([System.Drawing.Color]::White)
+    $header.Style.Fill.PatternType=[OfficeOpenXml.Style.ExcelFillStyle]::Solid
+    $header.Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::FromArgb(31,78,121))
+    $header.Style.HorizontalAlignment=[OfficeOpenXml.Style.ExcelHorizontalAlignment]::Center
+    $header.Style.VerticalAlignment=[OfficeOpenXml.Style.ExcelVerticalAlignment]::Center
+    $header.Style.WrapText=$true
+    $header.AutoFilter=$true
+
+    if ($lastRow -gt $HeaderRow) {
+        $body=$Worksheet.Cells[($HeaderRow+1),1,$lastRow,$lastColumn]
+        $body.Style.VerticalAlignment=[OfficeOpenXml.Style.ExcelVerticalAlignment]::Top
+    }
+
+    $Worksheet.Cells[$Worksheet.Dimension.Address].Style.Font.Name='Arial'
+    $Worksheet.Cells[$Worksheet.Dimension.Address].Style.Font.Size=10
+    $Worksheet.Cells[$Worksheet.Dimension.Address].AutoFitColumns()
+    for ($column=1; $column -le $lastColumn; $column++) {
+        if ($Worksheet.Column($column).Width -lt 12) { $Worksheet.Column($column).Width=12 }
+        if ($Worksheet.Column($column).Width -gt 45) {
+            $Worksheet.Column($column).Width=45
+            if ($lastRow -gt $HeaderRow) {
+                $Worksheet.Cells[($HeaderRow+1),$column,$lastRow,$column].Style.WrapText=$true
+            }
         }
     }
-}
-
-function New-YesNoTemplateRow {
-    param($Worksheet,[int]$HeaderRow)
-    $values=@{'Server Name'=$ComputerName}
-    if(-not $Worksheet -or -not $Worksheet.Dimension){ return $values }
-    for($column=1;$column -le $Worksheet.Dimension.End.Column;$column++){
-        $header=([string]$Worksheet.Cells[$HeaderRow,$column].Text).Trim()
-        if($header -and $header -ne 'Server Name'){ $values[$header]='No' }
-    }
-    return $values
-}
-
-function Clear-TemplateValues {
-    param($Worksheet,[string]$Address)
-    if(-not $Worksheet){ return }
-    foreach($cell in $Worksheet.Cells[$Address]){ $cell.Value=$null }
+    $Worksheet.View.ShowGridLines=$false
+    $Worksheet.View.FreezePanes(($HeaderRow+1),1)
 }
 
 function Add-DataSheet {
     param($Workbook,[string]$Name,[object[]]$Rows)
     if ($Workbook.Worksheets[$Name]) { $Workbook.Worksheets.Delete($Name) }
-    $sheet = $Workbook.Worksheets.Add($Name)
-    $data = @($Rows)
+    $sheet=$Workbook.Worksheets.Add($Name)
+    $data=@($Rows)
+
     if (-not $data.Count) {
-        $sheet.Cells[1,1].Value = 'Status'
-        $sheet.Cells[2,1].Value = 'No records returned.'
-        return
+        $sheet.Cells[1,1].Value='Status'
+        $sheet.Cells[2,1].Value='No records returned.'
+        Set-WorksheetStyle $sheet
+        return $sheet
     }
-    $headers = @($data[0].PSObject.Properties.Name)
+
+    $headers=@($data[0].PSObject.Properties.Name)
     for ($column=0; $column -lt $headers.Count; $column++) {
-        $sheet.Cells[1,($column+1)].Value = $headers[$column]
-        $sheet.Cells[1,($column+1)].Style.Font.Bold = $true
+        $sheet.Cells[1,($column+1)].Value=$headers[$column]
     }
+
     for ($row=0; $row -lt $data.Count; $row++) {
         for ($column=0; $column -lt $headers.Count; $column++) {
-            $value = $data[$row].PSObject.Properties[$headers[$column]].Value
-            if ($value -is [array]) { $value = Join-Unique $value }
-            $cell = $sheet.Cells[($row+2),($column+1)]
-            if ($value -is [bool]) { $value = if ($value) { 'Yes' } else { 'No' } }
-            $cell.Value = $value
-            if ($value -is [datetime]) { $cell.Style.Numberformat.Format = 'yyyy-mm-dd HH:mm:ss' }
+            $propertyName=$headers[$column]
+            $value=Convert-ToCellValue $data[$row].PSObject.Properties[$propertyName].Value
+            $cell=$sheet.Cells[($row+2),($column+1)]
+            $cell.Value=$value
+            if ($value -is [datetime]) {
+                $cell.Style.Numberformat.Format='yyyy-mm-dd HH:mm:ss'
+            } elseif ($propertyName -match 'Percent|Utilization|SizeGB|FreeGB|MemoryGB') {
+                $cell.Style.Numberformat.Format='0.00'
+            }
         }
     }
-    $sheet.View.FreezePanes(2,1)
-    $sheet.Cells[$sheet.Dimension.Address].AutoFitColumns()
+
+    Set-WorksheetStyle $sheet
+    return $sheet
 }
 
 if ($env:OS -ne 'Windows_NT') { throw 'Run this script on the Windows Server being inventoried.' }
@@ -176,23 +201,18 @@ function Initialize-ImportExcel {
 }
 
 Initialize-ImportExcel
-if ([string]::IsNullOrWhiteSpace($TemplatePath)) {
-    $templateCandidates = @(
-        (Join-Path $PSScriptRoot 'TPT - Server Migration Planning Document.xlsx'),
-        (Join-Path $PSScriptRoot '..\..\TPT - Server Migration Planning Document.xlsx')
-    )
-    $TemplatePath = $templateCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $TemplatePath) {
-        throw 'Workbook template not found. Place TPT - Server Migration Planning Document.xlsx beside this script or provide -TemplatePath.'
-    }
+$template=$null
+if (-not [string]::IsNullOrWhiteSpace($TemplatePath)) {
+    $template=Get-Item -LiteralPath $TemplatePath
+    if ($template.Extension -ne '.xlsx') { throw 'TemplatePath must be an .xlsx file.' }
 }
-$template = Get-Item -LiteralPath $TemplatePath
-if ($template.Extension -ne '.xlsx') { throw 'TemplatePath must be an .xlsx file.' }
 if (-not (Test-Path -LiteralPath $OutputDirectory)) {
     New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 }
-$outputPath = Join-Path $OutputDirectory ('{0}-ServerDiscovery-{1}.xlsx' -f $ComputerName,(Get-Date -Format yyyyMMdd-HHmmss))
-Copy-Item -LiteralPath $template.FullName -Destination $outputPath -Force
+$outputPath=Join-Path $OutputDirectory ('{0}-ServerDiscovery-{1}.xlsx' -f $ComputerName,(Get-Date -Format yyyyMMdd-HHmmss))
+if ($template) {
+    Copy-Item -LiteralPath $template.FullName -Destination $outputPath -Force
+}
 
 try {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -369,7 +389,7 @@ if($features.Name -contains 'AD-Domain-Services'){
                 JobTitle=$_.Title; Department=$_.Department; Company=$_.Company; Manager=$_.Manager
                 Description=$_.Description; Office=$_.Office; Telephone=$_.OfficePhone; Email=$_.EmailAddress
                 Mobile=$_.MobilePhone; Notes=$_.Info; Enabled=$_.Enabled; LastLogonDate=$_.LastLogonDate
-                LikelyServiceAccount=($_.SamAccountName -match '\$' -or @($_.ServicePrincipalName).Count -gt 0)
+                LikelyServiceAccount=($_.SamAccountName.EndsWith('$') -or @($_.ServicePrincipalName).Count -gt 0)
                 PasswordNeverExpires=$_.PasswordNeverExpires
             }
           }
@@ -472,263 +492,168 @@ $serviceAccounts=@($serviceAccounts | Sort-Object Account,Usage -Unique)
 
 $package=$null
 try {
-    $package=Open-ExcelPackage -Path $outputPath
+    if ($template) {
+        $package=Open-ExcelPackage -Path $outputPath
+    } else {
+        $package=Open-ExcelPackage -Path $outputPath -Create
+    }
     $book=$package.Workbook
-    $sys=$system|Select-Object -First 1
-    $nics=@($network|Select-Object -First 2)
-    $serverValues=@{
-        'Name'=$ComputerName; 'Physical/Virtual'=$sys.PhysicalOrVirtual
-        'OS'=('{0} ({1}, build {2})' -f $sys.OperatingSystem,$sys.Version,$sys.Build)
-        'CPU/vCPU'=$sys.LogicalProcessors; '# of CPUs'=$sys.Sockets; '# of Cores'=$sys.Cores
-        'RAM/vRAM'=('{0} GB' -f $sys.MemoryGB); 'Open Ports'=Join-Unique $ports.LocalPort ', '
-        'DHCP Server'=Join-Unique $dhcpClient; 'Mapped Drives'=Join-Unique $mapped
-    }
-    for($i=0;$i -lt [math]::Min($disks.Count,7);$i++){
-        $h=if($i -eq 0){'HDD1 Free Space'}else{'HDD{0}' -f ($i+1)}
-        $serverValues[$h]='{0} {1} GB free / {2} GB' -f $disks[$i].Drive,$disks[$i].FreeGB,$disks[$i].SizeGB
-    }
-    for($i=0;$i -lt $nics.Count;$i++){
-        $number=$i+1; $dnsValues=@($nics[$i].DNS -split ';\s*')
-        $serverValues["NIC$number IP"]=$nics[$i].IPAddress
-        $serverValues["NIC$number Subnet"]=$nics[$i].SubnetMask
-        $serverValues["NIC$number Gateway"]=$nics[$i].Gateway
-        if($number -eq 1){
-            for($d=0;$d -lt [math]::Min($dnsValues.Count,3);$d++){$serverValues["NIC1 DNS$($d+1)"]=$dnsValues[$d]}
-        }else{
-            if($dnsValues.Count){$serverValues['NIC2 DNS']=$dnsValues[0]}
-            if($dnsValues.Count -gt 1){$serverValues['NIC2 DNS2']=$dnsValues[1]}
-        }
-    }
-    Set-TemplateRow $book.Worksheets['Server Info'] 1 2 $serverValues
 
-    $roleSheet=$book.Worksheets['Server Roles']
-    $roleMap=[ordered]@{
-      'ADCS'='AD-Certificate';'ADDS'='AD-Domain-Services';'ADFS'='ADFS-Federation';'ADLDS'='ADLDS';'ADRMS'='ADRMS'
-      'Application Server'='Application-Server';'DHCP'='DHCP';'DNS'='DNS';'Fax Server'='Fax';'File Server'='FS-FileServer'
-      'File Resource Manager'='FS-Resource-Manager';'Data Deduplication'='FS-Data-Deduplication';'DFS Namespaces'='FS-DFS-Namespace'
-      'DFS Replication'='FS-DFS-Replication';'iSCSI Target Server'='FS-iSCSITarget-Server';'Storage Services'='Storage-Services'
-      'Hyper-V'='Hyper-V';'NPS'='NPAS';'Print Server'='Print-Server';'Distributed Scan'='Print-Scan-Server'
-      'Remote Access'='RemoteAccess';'RDS'='Remote-Desktop-Services';'RDS Connection Broker'='RDS-Connection-Broker'
-      'RDS Gateway'='RDS-Gateway';'RDS Licensing'='RDS-Licensing';'RDS Session Host'='RDS-RD-Server'
-      'RDS Virtualization Host'='RDS-Virtualization';'RDS Web Access'='RDS-Web-Access';'Volume Activation Services'='VolumeActivation'
-      'Web Server (IIS)'='Web-Server';'Web Server Management Tools'='Web-Mgmt-Tools';'WDS'='WDS';'WSUS'='UpdateServices'
-      'Windows Server Essentials Experience'='ServerEssentialsRole'
-    }
-    $rv=New-YesNoTemplateRow $roleSheet 1
-    foreach($e in $roleMap.GetEnumerator()){$rv[$e.Key]=if($features.Name -contains $e.Value){'Yes'}else{'No'}}
-    Set-TemplateRow $roleSheet 1 2 $rv
+    # Rebuild the workbook around normalized data. If a legacy template was
+    # supplied, its worksheets are intentionally replaced to avoid duplicate
+    # summary/detail tabs and stale sample values.
+    $existingSheetNames=@($book.Worksheets | ForEach-Object Name)
+    $workingSheetName='__DiscoveryBuild'
+    while ($book.Worksheets[$workingSheetName]) { $workingSheetName='_' + $workingSheetName }
+    $null=$book.Worksheets.Add($workingSheetName)
+    foreach ($sheetName in $existingSheetNames) { $book.Worksheets.Delete($sheetName) }
 
-    $featureSheet=$book.Worksheets['Server Features']
-    $featureMap=[ordered]@{
-      '.NET Framework 3.5 Features'='NET-Framework-Features';'.NET Framework 4.5/4.6/4.7 Features'='NET-Framework-45-Features'
-      'ASP.NET 4.7'='NET-Framework-45-ASPNET';'Web Server Tools'='Web-Mgmt-Tools';'Windows Communication Foundation'='NET-WCF-Services45'
-      'BITS'='BITS';'BitLocker Drive Encryption'='BitLocker';'Enhanced Storage'='EnhancedStorage';'Failover Clustering'='Failover-Clustering'
-      'Group Policy Management'='GPMC';'I/O Quality of Service'='DiskIo-QoS';'IIS Hostable Web Core'='Web-WHC'
-      'Ink and Handwriting Services'='InkAndHandwritingServices';'IPAM'='IPAM';'Media Foundation'='Server-Media-Foundation'
-      'Remote Assistance'='Remote-Assistance';'Message Queuing'='MSMQ';'Remote Differential Compression'='RDC'
-      'Multipath I/O'='Multipath-IO';'Network Load Balancing'='NLB';'RSAT'='RSAT';'RPC over HTTP Proxy'='RPC-over-HTTP-Proxy'
-      'RDS Tools'='RSAT-RDS-Tools';'SMB 1.0 / CIFS File Sharing Support'='FS-SMB1';'SMTP Server'='SMTP-Server'
-      'SNMP Service'='SNMP-Service';'System Data Archiver'='System-DataArchiver';'Telnet Client'='Telnet-Client';'TFTP Client'='TFTP-Client'
-      'Windows Defender Features'='Windows-Defender';'Windows Identity Foundation 3.5'='Windows-Identity-Foundation'
-      'Windows Internal Database'='Windows-Internal-Database';'Windows PowerShell'='PowerShellRoot'
-      'Windows Process Activation Service'='WAS';'Windows Search Services'='Search-Service';'Windows Server Backup'='Windows-Server-Backup'
-      'Windows Server Migration Tools'='Migration';'WINS Server'='WINS';'WoW64 Support'='WoW64-Support';'XPS Viewer'='XPS-Viewer'
-    }
-    $fv=New-YesNoTemplateRow $featureSheet 1
-    foreach($e in $featureMap.GetEnumerator()){$fv[$e.Key]=if($features.Name -contains $e.Value){'Yes'}else{'No'}}
-    Set-TemplateRow $featureSheet 1 2 $fv
+    $sys=$system | Select-Object -First 1
+    $installedRoleNames=Join-Unique @($features | Where-Object FeatureType -eq Role | Select-Object -ExpandProperty DisplayName)
+    $installedFeatureNames=Join-Unique @($features | Where-Object FeatureType -ne Role | Select-Object -ExpandProperty DisplayName)
+    $ipv4Addresses=Join-Unique $network.IPAddress
+    $gateways=Join-Unique $network.Gateway
+    $dnsServers=Join-Unique $network.DNS
+    $diskTotal=($disks | Measure-Object SizeGB -Sum).Sum
+    $diskFree=($disks | Measure-Object FreeGB -Sum).Sum
+    $collectorFailures=@($script:Diagnostics | Where-Object Status -eq Failed).Count
+    $collectorWarnings=@($script:Diagnostics | Where-Object Status -eq Warning).Count
+    $discoveryStatus=if ($collectorFailures) { 'Completed with collector failures' } elseif ($collectorWarnings) { 'Completed with warnings' } else { 'Complete' }
+
+    $summary=@(
+        [pscustomobject][ordered]@{Category='Discovery';Metric='Status';Value=$discoveryStatus}
+        [pscustomobject][ordered]@{Category='Discovery';Metric='Generated';Value=(Get-Date)}
+        [pscustomobject][ordered]@{Category='Discovery';Metric='Collector failures';Value=$collectorFailures}
+        [pscustomobject][ordered]@{Category='Discovery';Metric='Collector warnings';Value=$collectorWarnings}
+        [pscustomobject][ordered]@{Category='Identity';Metric='Computer name';Value=$ComputerName}
+        [pscustomobject][ordered]@{Category='Identity';Metric='Domain';Value=$sys.Domain}
+        [pscustomobject][ordered]@{Category='Identity';Metric='Physical or virtual';Value=$sys.PhysicalOrVirtual}
+        [pscustomobject][ordered]@{Category='Identity';Metric='Manufacturer';Value=$sys.Manufacturer}
+        [pscustomobject][ordered]@{Category='Identity';Metric='Model';Value=$sys.Model}
+        [pscustomobject][ordered]@{Category='Identity';Metric='Serial number';Value=$sys.SerialNumber}
+        [pscustomobject][ordered]@{Category='Operating system';Metric='Name';Value=$sys.OperatingSystem}
+        [pscustomobject][ordered]@{Category='Operating system';Metric='Version';Value=$sys.Version}
+        [pscustomobject][ordered]@{Category='Operating system';Metric='Build';Value=$sys.Build}
+        [pscustomobject][ordered]@{Category='Operating system';Metric='Last boot';Value=$sys.LastBoot}
+        [pscustomobject][ordered]@{Category='Compute';Metric='CPU';Value=$sys.CPU}
+        [pscustomobject][ordered]@{Category='Compute';Metric='Sockets';Value=$sys.Sockets}
+        [pscustomobject][ordered]@{Category='Compute';Metric='Cores';Value=$sys.Cores}
+        [pscustomobject][ordered]@{Category='Compute';Metric='Logical processors';Value=$sys.LogicalProcessors}
+        [pscustomobject][ordered]@{Category='Compute';Metric='Memory (GB)';Value=$sys.MemoryGB}
+        [pscustomobject][ordered]@{Category='Network';Metric='IPv4 addresses';Value=$ipv4Addresses}
+        [pscustomobject][ordered]@{Category='Network';Metric='Gateways';Value=$gateways}
+        [pscustomobject][ordered]@{Category='Network';Metric='DNS servers';Value=$dnsServers}
+        [pscustomobject][ordered]@{Category='Network';Metric='DHCP servers';Value=(Join-Unique $dhcpClient)}
+        [pscustomobject][ordered]@{Category='Network';Metric='Mapped drives';Value=(Join-Unique $mapped)}
+        [pscustomobject][ordered]@{Category='Storage';Metric='Volumes';Value=$disks.Count}
+        [pscustomobject][ordered]@{Category='Storage';Metric='Total capacity (GB)';Value=$diskTotal}
+        [pscustomobject][ordered]@{Category='Storage';Metric='Free capacity (GB)';Value=$diskFree}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Installed roles';Value=$installedRoleNames}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Installed features';Value=$installedFeatureNames}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Applications';Value=$applications.Count}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Services';Value=$services.Count}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Listening ports';Value=$ports.Count}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='SMB shares';Value=$shares.Count}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Printers';Value=$printers.Count}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Scheduled tasks';Value=$tasks.Count}
+        [pscustomobject][ordered]@{Category='Directory services';Metric='AD users';Value=$adUsers.Count}
+        [pscustomobject][ordered]@{Category='Directory services';Metric='AD group memberships';Value=$adMembership.Count}
+        [pscustomobject][ordered]@{Category='Directory services';Metric='Replication partners';Value=$adReplication.Count}
+        [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DHCP scopes';Value=$dhcp.Count}
+        [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DNS zones';Value=$dns.Count}
+        [pscustomobject][ordered]@{Category='Migration review';Metric='SMB 1.0/CIFS';Value=$(if ($features.Name -contains 'FS-SMB1') { 'Installed' } else { 'Not installed' })}
+        [pscustomobject][ordered]@{Category='Migration review';Metric='Service accounts in Windows services';Value=$serviceAccounts.Count}
+    )
+    $null=Add-DataSheet $book 'Discovery Summary' $summary
 
     $software=Join-Unique @($applications.Name+$services.Name+$services.DisplayName) ([Environment]::NewLine)
-    $azureSheet=$book.Worksheets['Azure Agents-Apps-Services']
     $azurePatterns=[ordered]@{
-      'MMA'='Microsoft Monitoring Agent|OMS Agent';'Azure Data Studio'='Azure Data Studio'
-      'Azure Workload Backup'='Azure.*Workload|Microsoft Azure Recovery Services';'Azure Powershell'='Azure PowerShell|Az PowerShell'
-      'UI Flow'='Power Automate|UI flows';'On-Premises Data Gateway'='On-premises data gateway'
-      'Azure Plug-in for Veeam'='Veeam.*Azure|Azure.*Veeam';'Azure Backup'='Azure Backup'
-      'Azure Site Recovery Mobility Service'='Site Recovery.*Mobility|Microsoft Azure Site Recovery'
-      'Windows Azure VM Agent'='Windows Azure VM Agent|WindowsAzureGuestAgent|RdAgent'
-      'Azure AD Connect Authentication Agent'='Azure AD Connect Authentication Agent|Entra Connect Authentication Agent'
-      'Azure AD Connect'='Azure AD Connect|Microsoft Entra Connect';'Citrix Azure Provisioning'='Citrix.*Azure'
-      'Azure Connected Storage Service'='Azure Connected Storage';'Azure Recovery Services'='Azure Recovery Services'
-      'Azure Information Protection'='Azure Information Protection';'Azure Advanced Threat Protection Sensor'='Azure ATP|Defender for Identity'
-      'Azure AD Connect Agent Updater'='Azure AD Connect Agent Updater|Entra Connect Agent Updater'
-      'NPS Extension for Azure MFA'='NPS Extension.*Azure MFA|Azure MFA.*NPS';'Intune Connector dor AD'='Intune Connector.*Active Directory'
-      'Microsoft Azure Active Directory Application Proxy Connector'='Application Proxy Connector'
-      'Storage Sync Agent'='Storage Sync Agent|Azure File Sync'
+        'Microsoft Monitoring Agent'='Microsoft Monitoring Agent|OMS Agent'
+        'Azure Data Studio'='Azure Data Studio'
+        'Azure Workload Backup'='Azure.*Workload|Microsoft Azure Recovery Services'
+        'Azure PowerShell'='Azure PowerShell|Az PowerShell'
+        'Power Automate UI flows'='Power Automate|UI flows'
+        'On-premises Data Gateway'='On-premises data gateway'
+        'Azure plug-in for Veeam'='Veeam.*Azure|Azure.*Veeam'
+        'Azure Backup'='Azure Backup'
+        'Azure Site Recovery Mobility Service'='Site Recovery.*Mobility|Microsoft Azure Site Recovery'
+        'Windows Azure VM Agent'='Windows Azure VM Agent|WindowsAzureGuestAgent|RdAgent'
+        'Entra Connect Authentication Agent'='Azure AD Connect Authentication Agent|Entra Connect Authentication Agent'
+        'Microsoft Entra Connect'='Azure AD Connect|Microsoft Entra Connect'
+        'Citrix Azure Provisioning'='Citrix.*Azure'
+        'Azure Connected Storage Service'='Azure Connected Storage'
+        'Azure Recovery Services'='Azure Recovery Services'
+        'Azure Information Protection'='Azure Information Protection'
+        'Defender for Identity Sensor'='Azure ATP|Defender for Identity'
+        'Entra Connect Agent Updater'='Azure AD Connect Agent Updater|Entra Connect Agent Updater'
+        'NPS Extension for Azure MFA'='NPS Extension.*Azure MFA|Azure MFA.*NPS'
+        'Intune Connector for Active Directory'='Intune Connector.*Active Directory'
+        'Microsoft Entra Application Proxy Connector'='Application Proxy Connector'
+        'Storage Sync Agent'='Storage Sync Agent|Azure File Sync'
     }
-    $av=New-YesNoTemplateRow $azureSheet 1
-    $av['Azure VM']=if($sys.Manufacturer -match 'Microsoft' -and $sys.Model -match 'Virtual'){'Yes'}else{'No'}
-    foreach($e in $azurePatterns.GetEnumerator()){$av[$e.Key]=if($software -match $e.Value){'Yes'}else{'No'}}
-    Set-TemplateRow $azureSheet 1 2 $av
-
-    $lob=$book.Worksheets['LoB Applications']
-    if($lob){
-        Clear-TemplateValues $lob 'B2:BO2'
-        $lob.Cells[2,1].Value=$ComputerName
-        for($i=0;$i -lt [math]::Min($applications.Count,$lob.Dimension.End.Column-1);$i++){
-            $lob.Cells[2,($i+2)].Value=$applications[$i].Name
+    $azureSignals=@(
+        [pscustomobject][ordered]@{
+            Component='Azure virtual machine'
+            Detected=$(if ($sys.Manufacturer -match 'Microsoft' -and $sys.Model -match 'Virtual') { 'Yes' } else { 'No' })
         }
-    }
-
-    $shareSheet=$book.Worksheets['File Server Shares']
-    $securitySheet=$book.Worksheets['File Server Security']
-    Clear-TemplateValues $shareSheet 'A3:G65'
-    Clear-TemplateValues $securitySheet 'A2:G39'
-    for($i=0;$i -lt $shares.Count;$i++){
-        if($shareSheet){
-            $r=$i+3;$shareSheet.Cells[$r,1].Value=$ComputerName;$shareSheet.Cells[$r,2].Value=$shares[$i].Path
-            $shareSheet.Cells[$r,3].Value=$(if($shares[$i].Path -match '^[A-Za-z]:'){$shares[$i].Path.Substring(0,2)}else{$null})
-            $shareSheet.Cells[$r,5].Value=$shares[$i].Name;$shareSheet.Cells[$r,6].Value=$shares[$i].UNCPath;$shareSheet.Cells[$r,7].Value=$shares[$i].Path
-        }
-        if($securitySheet){
-            $r=$i+2;$securitySheet.Cells[$r,1].Value=$ComputerName;$securitySheet.Cells[$r,2].Value=$shares[$i].Path
-            $securitySheet.Cells[$r,3].Value=$shares[$i].UNCPath;$securitySheet.Cells[$r,4].Value=$shares[$i].SharePermissions
-            $securitySheet.Cells[$r,6].Value=$shares[$i].NTFSPermissions
-        }
-    }
-
-    $printerSheet=$book.Worksheets['Printers Shares']
-    if($printerSheet){
-        Clear-TemplateValues $printerSheet 'A3:B100'
-        $printerSheet.Cells[1,2].Value=$ComputerName
-        for($i=0;$i -lt $printers.Count;$i++){
-            $r=$i+3
-            $printerSheet.Cells[$r,1].Value=$(if($printers[$i].ShareName){$printers[$i].ShareName}else{$printers[$i].Name})
-            $printerSheet.Cells[$r,2].Value=$printers[$i].PortName
-        }
-    }
-
-    $taskSheet=$book.Worksheets['Scheduled Tasks']
-    Clear-TemplateValues $taskSheet 'A2:E38'
-    for($i=0;$taskSheet -and $i -lt $tasks.Count;$i++){
-        $r=$i+2;$taskSheet.Cells[$r,1].Value=$tasks[$i].Name;$taskSheet.Cells[$r,2].Value=$ComputerName
-        $taskSheet.Cells[$r,3].Value=$tasks[$i].Location;$taskSheet.Cells[$r,4].Value=$tasks[$i].Executable
-        $taskSheet.Cells[$r,5].Value=$tasks[$i].Description
-    }
-
-    $accountSheet=$book.Worksheets['Accounts and Groups']
-    if($accountSheet){
-        Clear-TemplateValues $accountSheet 'A2:B4'
-        Clear-TemplateValues $accountSheet 'A8:B10'
-        Clear-TemplateValues $accountSheet 'A14:D16'
-        for($i=0;$i -lt [math]::Min($accounts.Count,3);$i++){
-            $accountSheet.Cells[$i+2,1].Value=$accounts[$i].Name
-        }
-        if($adUsers.Count){
-            $accountSheet.Cells[8,1].Value=('{0} domain accounts; see User Accounts' -f $adUsers.Count)
-            $accountSheet.Cells[8,2].Value='See SecurityGroups for memberships'
-        }
-        for($i=0;$i -lt [math]::Min($serviceAccounts.Count,3);$i++){
-            $accountSheet.Cells[$i+14,1].Value=$serviceAccounts[$i].Account
-            $accountSheet.Cells[$i+14,2].Value=$serviceAccounts[$i].Usage
-            $accountSheet.Cells[$i+14,3].Value=$serviceAccounts[$i].InteractiveLoginRequired
-            $accountSheet.Cells[$i+14,4].Value=$serviceAccounts[$i].ManagedServiceAccount
-        }
-    }
-
-    if($dc.Count){
-        $ad=$book.Worksheets['Active Directory'];$d=$dc[0]
-        if($ad){
-            $ad.Cells[2,2].Value=('Domain FQDN: {0}' -f $d.DomainFQDN)
-            $ad.Cells[2,4].Value=('Domain Shortname: {0}' -f $d.DomainShortName)
-            $ad.Cells[2,6].Value=('Additional UPN: {0}' -f $d.UPNSuffixes)
-            $ad.Cells[4,2].Value=$d.FQDN;$ad.Cells[4,3].Value=$d.OperatingSystem;$ad.Cells[4,4].Value='Online'
-            $ad.Cells[4,5].Value=if($d.GlobalCatalog){'Yes'}else{'No'};$ad.Cells[4,6].Value=$d.Site
-            $ad.Cells[4,7].Value=if($d.ReadOnly){'Yes'}else{'No'};$ad.Cells[4,8].Value=if($features.Name -contains 'DHCP'){'Yes'}else{'No'}
-            $ad.Cells[13,2].Value=$d.FQDN;$ad.Cells[13,3].Value=if($d.PDC -eq $d.FQDN){'x'}else{''}
-            $ad.Cells[13,4].Value=if($d.SchemaMaster -eq $d.FQDN){'x'}else{''};$ad.Cells[13,5].Value=if($d.NamingMaster -eq $d.FQDN){'x'}else{''}
-            $ad.Cells[13,6].Value=if($d.RIDMaster -eq $d.FQDN){'x'}else{''};$ad.Cells[13,7].Value=if($d.InfrastructureMaster -eq $d.FQDN){'x'}else{''}
-            $ad.Cells[21,2].Value=$d.ForestMode;$ad.Cells[21,3].Value=$d.DomainMode
-            Clear-TemplateValues $ad 'B24:E38'
-            for($i=0;$i -lt [math]::Min($adReplication.Count,15);$i++){
-                $r=$i+24;$ad.Cells[$r,2].Value=$adReplication[$i].FromServer;$ad.Cells[$r,3].Value=$adReplication[$i].ToServer
-                $ad.Cells[$r,4].Value=$adReplication[$i].LastSync;$ad.Cells[$r,4].Style.Numberformat.Format='yyyy-mm-dd HH:mm:ss'
-                $ad.Cells[$r,5].Value=$adReplication[$i].Status
+        foreach ($entry in $azurePatterns.GetEnumerator()) {
+            [pscustomobject][ordered]@{
+                Component=$entry.Key
+                Detected=$(if ($software -match $entry.Value) { 'Yes' } else { 'No' })
             }
-            $ad.Cells[41,2].Value=$d.FQDN
-            $ad.Cells[41,3].Value=if($services.Name -contains 'ADSync'){'Configured'}else{'Not detected'}
         }
-    }
+    )
 
-    $dhcpSheet=$book.Worksheets['DHCP']
-    Clear-TemplateValues $dhcpSheet 'A4:P9'
-    for($i=0;$dhcpSheet -and $i -lt $dhcp.Count;$i++){
-        $s=$dhcp[$i];$optionValues=@($s.ScopeOptions)
-        $vals=@{
-          'Server Name'=$ComputerName;'Scope Name'=$s.ScopeName;'Status'=$s.Status
-          'Scope'=('{0} / {1}' -f $s.ScopeId,$s.SubnetMask);'Address Pool'=$s.AddressPool
-          'Exclusions'=$s.Exclusions;'Reservations'=$s.Reservations
-          'Scope Utilization'=$s.Utilization;'Lease Duration'=$s.LeaseDuration;'NAP'=$s.NAP;'Failover'=$s.Failover
+    $dhcpRows=@(
+        foreach ($scope in $dhcp) {
+            [pscustomobject][ordered]@{
+                ServerName=$scope.ServerName
+                ScopeName=$scope.ScopeName
+                Status=$scope.Status
+                ScopeId=$scope.ScopeId
+                StartRange=$scope.StartRange
+                EndRange=$scope.EndRange
+                SubnetMask=$scope.SubnetMask
+                AddressPool=$scope.AddressPool
+                Exclusions=$scope.Exclusions
+                Reservations=$scope.Reservations
+                ScopeOptions=(Join-Unique @($scope.ScopeOptions))
+                LeaseDuration=$scope.LeaseDuration
+                Utilization=$scope.Utilization
+                NAP=$scope.NAP
+                Failover=$scope.Failover
+            }
         }
-        for($optionIndex=0;$optionIndex -lt [math]::Min($optionValues.Count,5);$optionIndex++){
-            $vals['Scope Options{0}' -f ($optionIndex+1)]=$optionValues[$optionIndex]
-        }
-        Set-TemplateRow $dhcpSheet 3 ($i+4) $vals
-    }
+    )
 
-    $dnsSheet=$book.Worksheets['DNS']
-    if($dnsSheet){
-        Clear-TemplateValues $dnsSheet 'B4:C13'
-        Clear-TemplateValues $dnsSheet 'E4:H13'
-        Clear-TemplateValues $dnsSheet 'E16:H31'
-        $dnsSheet.Cells[4,2].Value=$(if($dc.Count){$dc[0].FQDN}else{$ComputerName})
-        $dnsSheet.Cells[4,3].Value='Online'
-        $forward=@($dns|Where-Object{-not $_.IsReverseLookupZone})
-        $reverse=@($dns|Where-Object{$_.IsReverseLookupZone})
-        for($i=0;$i -lt [math]::Min($forward.Count,10);$i++){
-            $r=$i+4;$dnsSheet.Cells[$r,5].Value=$forward[$i].ZoneName;$dnsSheet.Cells[$r,6].Value=$forward[$i].ZoneType
-            $dnsSheet.Cells[$r,7].Value='Loaded';$dnsSheet.Cells[$r,8].Value='Not collected'
-        }
-        for($i=0;$i -lt [math]::Min($reverse.Count,16);$i++){
-            $r=$i+16;$dnsSheet.Cells[$r,5].Value=$reverse[$i].ZoneName;$dnsSheet.Cells[$r,6].Value=$reverse[$i].ZoneType
-            $dnsSheet.Cells[$r,7].Value='Loaded';$dnsSheet.Cells[$r,8].Value='Not collected'
-        }
-    }
+    $null=Add-DataSheet $book 'System' $system
+    $null=Add-DataSheet $book 'Network' $network
+    $null=Add-DataSheet $book 'Storage' $disks
+    $null=Add-DataSheet $book 'Roles and Features' $features
+    $null=Add-DataSheet $book 'Applications' $applications
+    $null=Add-DataSheet $book 'Services' $services
+    $null=Add-DataSheet $book 'Listening Ports' $ports
+    $null=Add-DataSheet $book 'Shares and Permissions' $shares
+    $null=Add-DataSheet $book 'Printers' $printers
+    $null=Add-DataSheet $book 'Scheduled Tasks' $tasks
+    $null=Add-DataSheet $book 'Local Accounts' $accounts
+    $null=Add-DataSheet $book 'Local Group Membership' $groups
+    $null=Add-DataSheet $book 'Service Accounts' $serviceAccounts
+    $null=Add-DataSheet $book 'Azure Components' $azureSignals
+    $null=Add-DataSheet $book 'Active Directory' $dc
+    $null=Add-DataSheet $book 'AD Users' $adUsers
+    $null=Add-DataSheet $book 'AD Group Membership' $adMembership
+    $null=Add-DataSheet $book 'AD Replication' $adReplication
+    $null=Add-DataSheet $book 'DHCP Scopes' $dhcpRows
+    $null=Add-DataSheet $book 'DNS Zones' $dns
+    $null=Add-DataSheet $book 'Diagnostics' $script:Diagnostics
 
-    $userSheet=$book.Worksheets['User Accounts']
-    if($userSheet){
-        for($i=0;$i -lt $adUsers.Count;$i++){
-            $u=$adUsers[$i];$r=$i+3
-            $values=@($u.FirstName,$u.LastName,$u.DisplayName,$u.SamAccountName,$u.UserPrincipalName,$u.Street,$u.City,$u.State,$u.PostalCode,$u.Country,
-              $u.JobTitle,$u.Department,$u.Company,$u.Manager,$u.Description,$u.Office,$u.Telephone,$u.Email,$u.Mobile,$u.Notes,
-              $(if($u.Enabled){'Enabled'}else{'Disabled'}),$u.LastLogonDate)
-            for($c=0;$c -lt $values.Count;$c++){$userSheet.Cells[$r,($c+1)].Value=$values[$c]}
-            if($u.LastLogonDate){$userSheet.Cells[$r,22].Style.Numberformat.Format='yyyy-mm-dd HH:mm:ss'}
-        }
-    }
-
-    $groupSheet=$book.Worksheets['SecurityGroups']
-    if($groupSheet){
-        for($i=0;$i -lt $adMembership.Count;$i++){
-            $r=$i+3;$groupSheet.Cells[$r,1].Value=$adMembership[$i].Username
-            $groupSheet.Cells[$r,2].Value=$adMembership[$i].Name;$groupSheet.Cells[$r,3].Value=$adMembership[$i].GroupName
-        }
-    }
-
-    Add-DataSheet $book 'System Inventory' $system
-    Add-DataSheet $book 'Network Inventory' $network
-    Add-DataSheet $book 'Disk Inventory' $disks
-    Add-DataSheet $book 'Listening Ports' $ports
-    Add-DataSheet $book 'Application Inventory' $applications
-    Add-DataSheet $book 'Services' $services
-    Add-DataSheet $book 'Installed Features' $features
-    Add-DataSheet $book 'SMB Share Inventory' $shares
-    Add-DataSheet $book 'Printer Inventory' $printers
-    Add-DataSheet $book 'Local Accounts' $accounts
-    Add-DataSheet $book 'Local Group Membership' $groups
-    Add-DataSheet $book 'Task Inventory' $tasks
-    Add-DataSheet $book 'Domain Controller Inventory' $dc
-    Add-DataSheet $book 'DHCP Scope Inventory' $dhcp
-    Add-DataSheet $book 'DNS Zone Inventory' $dns
-    Add-DataSheet $book 'AD User Inventory' $adUsers
-    Add-DataSheet $book 'AD Group Membership' $adMembership
-    Add-DataSheet $book 'AD Replication' $adReplication
-    Add-DataSheet $book 'Service Account Usage' $serviceAccounts
-    Add-DataSheet $book 'Diagnostics' $script:Diagnostics
+    $book.Worksheets.Delete($workingSheetName)
+    $book.View.ActiveTab=0
     Close-ExcelPackage -ExcelPackage $package
     $package=$null
 } catch {
-    if($package){$package.Dispose()}
+    if ($package) { $package.Dispose() }
     throw
 }
 
