@@ -68,6 +68,23 @@ function Set-TemplateRow {
     }
 }
 
+function New-YesNoTemplateRow {
+    param($Worksheet,[int]$HeaderRow)
+    $values=@{'Server Name'=$ComputerName}
+    if(-not $Worksheet -or -not $Worksheet.Dimension){ return $values }
+    for($column=1;$column -le $Worksheet.Dimension.End.Column;$column++){
+        $header=([string]$Worksheet.Cells[$HeaderRow,$column].Text).Trim()
+        if($header -and $header -ne 'Server Name'){ $values[$header]='No' }
+    }
+    return $values
+}
+
+function Clear-TemplateValues {
+    param($Worksheet,[string]$Address)
+    if(-not $Worksheet){ return }
+    foreach($cell in $Worksheet.Cells[$Address]){ $cell.Value=$null }
+}
+
 function Add-DataSheet {
     param($Workbook,[string]$Name,[object[]]$Rows)
     if ($Workbook.Worksheets[$Name]) { $Workbook.Worksheets.Delete($Name) }
