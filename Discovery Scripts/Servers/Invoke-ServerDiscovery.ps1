@@ -336,6 +336,66 @@ if($features.Name -contains 'AD-Domain-Services'){
     }
 }else{Add-Diagnostic 'Domain Controller' Success 'Skipped; AD DS role is not installed.'}
 
+$adUsers=@()
+$adMembership=@()
+$adReplication=@()
+if($features.Name -contains 'AD-Domain-Services'){
+    $adUsers=Invoke-Collector 'AD Users' {
+        Import-Module ActiveDirectory -ErrorAction Stop
+        Get-ADUser -Filter * -Properties GivenName,Surname,DisplayName,UserPrincipalName,StreetAddress,City,State,PostalCode,co,Title,Department,Company,Manager,Description,Office,OfficePhone,EmailAddress,MobilePhone,Info,Enabled,LastLogonDate,ServicePrincipalName,PasswordNeverExpires |
+          Sort-Object SamAccountName | ForEach-Object {
+            [pscustomobject][ordered]@{
+                FirstName=$_.GivenName; LastName=$_.Surname; DisplayName=$_.DisplayName
+                SamAccountName=$_.SamAccountName; UserPrincipalName=$_.UserPrincipalName
+                Street=$_.StreetAddress; City=$_.City; State=$_.State; PostalCode=$_.PostalCode; Country=$_.co
+                JobTitle=$_.Title; Department=$_.Department; Company=$_.Company; Manager=$_.Manager
+                Description=$_.Description; Office=$_.Office; Telephone=$_.OfficePhone; Email=$_.EmailAddress
+                Mobile=$_.MobilePhone; Notes=$_.Info; Enabled=$_.Enabled; LastLogonDate=$_.LastLogonDate
+                LikelyServiceAccount=($_.SamAccountName -match '\$' -or @($_.ServicePrincipalName).Count -gt 0)
+                PasswordNeverExpires=$_.PasswordNeverExpires
+            }
+          }
+    }
+
+    $adMembership=Invoke-Collector 'AD Group Membership' {
+        Import-Module ActiveDirectory -ErrorAction Stop
+        $domain=Get-ADDomain
+        $primaryGroups=@{}
+        foreach($user in Get-ADUser -Filter * -Properties DisplayName,MemberOf,PrimaryGroupID){
+            foreach($groupDn in @($user.MemberOf)){
+                $groupName=(($groupDn -split '(?<!\\),')[0] -replace '^CN=','') -replace '\\,',','
+                [pscustomobject][ordered]@{
+                    Username=$user.SamAccountName; Name=$user.DisplayName; GroupName=$groupName; MembershipType='Direct'
+                }
+            }
+            $rid=[string]$user.PrimaryGroupID
+            if($rid){
+                if(-not $primaryGroups.ContainsKey($rid)){
+                    $primarySid='{0}-{1}' -f $domain.DomainSID.Value,$rid
+                    $primaryGroups[$rid]=(Get-ADGroup -Identity $primarySid).Name
+                }
+                [pscustomobject][ordered]@{
+                    Username=$user.SamAccountName; Name=$user.DisplayName; GroupName=$primaryGroups[$rid]; MembershipType='Primary'
+                }
+            }
+        }
+    }
+
+    $adReplication=Invoke-Collector 'AD Replication' {
+        Import-Module ActiveDirectory -ErrorAction Stop
+        Get-ADReplicationPartnerMetadata -Target $ComputerName -Scope Server | ForEach-Object {
+            [pscustomobject][ordered]@{
+                FromServer=$_.Partner; ToServer=$_.Server; LastSync=$_.LastReplicationSuccess
+                Status=$(if($_.LastReplicationResult -eq 0){'Success'}else{'Error {0}' -f $_.LastReplicationResult})
+            }
+        }
+    }
+}else{
+    Add-Diagnostic 'AD Users' Success 'Skipped; AD DS role is not installed.'
+    Add-Diagnostic 'AD Group Membership' Success 'Skipped; AD DS role is not installed.'
+    Add-Diagnostic 'AD Replication' Success 'Skipped; AD DS role is not installed.'
+}
+
 $dhcp=@()
 if($features.Name -contains 'DHCP'){
     $dhcp=Invoke-Collector 'DHCP Scopes' {
