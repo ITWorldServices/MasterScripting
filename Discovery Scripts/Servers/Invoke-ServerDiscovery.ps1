@@ -46,8 +46,10 @@ function Invoke-Collector {
 
 function Join-Unique {
     param([object[]]$Values,[string]$Separator = '; ')
-    return (($Values | Where-Object { $null -ne $_ -and "$_".Trim() } |
+    $joined=(($Values | Where-Object { $null -ne $_ -and "$_".Trim() } |
         ForEach-Object { "$_".Trim() } | Sort-Object -Unique) -join $Separator)
+    if ([string]::IsNullOrWhiteSpace($joined)) { return $null }
+    return $joined
 }
 
 function Convert-PrefixToMask {
@@ -438,29 +440,114 @@ if($features.Name -contains 'AD-Domain-Services'){
 }
 
 $dhcp=@()
+$dhcpExclusions=@()
+$dhcpReservations=@()
+$dhcpOptions=@()
+$dhcpFailover=@()
 if($features.Name -contains 'DHCP'){
+    if(-not(Get-Command Get-DhcpServerv4Scope -ErrorAction SilentlyContinue)){throw 'DHCP cmdlets are unavailable.'}
+
     $dhcp=Invoke-Collector 'DHCP Scopes' {
-        if(-not(Get-Command Get-DhcpServerv4Scope -ErrorAction SilentlyContinue)){throw 'DHCP cmdlets are unavailable.'}
-        foreach($s in Get-DhcpServerv4Scope -ComputerName $ComputerName){
-            $stats=try{Get-DhcpServerv4ScopeStatistics -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{$null}
-            $exclusions=try{Get-DhcpServerv4ExclusionRange -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{@()}
-            $reservations=try{Get-DhcpServerv4Reservation -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{@()}
-            $options=try{Get-DhcpServerv4OptionValue -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{@()}
-            $failover=try{Get-DhcpServerv4Failover -ComputerName $ComputerName -ScopeId $s.ScopeId}catch{$null}
+        foreach($s in Get-DhcpServerv4Scope -ComputerName $ComputerName -ErrorAction Stop){
+            $stats=try{
+                Get-DhcpServerv4ScopeStatistics -ComputerName $ComputerName -ScopeId $s.ScopeId -ErrorAction Stop
+            }catch{
+                Add-Diagnostic 'DHCP Scope Statistics' Warning ('{0}: {1}' -f $s.ScopeId,$_.Exception.Message)
+                $null
+            }
             [pscustomobject][ordered]@{
-                ServerName=$ComputerName; ScopeName=$s.Name; Status=$s.State; ScopeId=$s.ScopeId
-                StartRange=$s.StartRange; EndRange=$s.EndRange; SubnetMask=$s.SubnetMask
+                ServerName=$ComputerName
+                ScopeName=$s.Name
+                Status=$s.State
+                ScopeId=$s.ScopeId
+                StartRange=$s.StartRange
+                EndRange=$s.EndRange
+                SubnetMask=$s.SubnetMask
                 AddressPool=('{0} - {1}' -f $s.StartRange,$s.EndRange)
-                Exclusions=Join-Unique @($exclusions|ForEach-Object{'{0} - {1}' -f $_.StartRange,$_.EndRange})
-                Reservations=Join-Unique @($reservations|ForEach-Object{'{0} ({1})' -f $_.IPAddress,$_.Name})
-                ScopeOptions=@($options|ForEach-Object{'{0} {1}: {2}' -f $_.OptionId,$_.Name,($_.Value -join ', ')})
-                LeaseDuration=$s.LeaseDuration; Utilization=$(if($stats){$stats.PercentageInUse}else{$null})
+                LeaseDuration=$s.LeaseDuration
+                Utilization=$(if($stats){$stats.PercentageInUse}else{$null})
                 NAP=$(if($s.PSObject.Properties['NapEnable']){$s.NapEnable}else{$null})
-                Failover=$(if($failover){$failover.Name}else{$null})
             }
         }
     }
-}else{Add-Diagnostic 'DHCP Scopes' Success 'Skipped; DHCP role is not installed.'}
+
+    $dhcpExclusions=Invoke-Collector 'DHCP Exclusions' {
+        foreach($s in $dhcp){
+            Get-DhcpServerv4ExclusionRange -ComputerName $ComputerName -ScopeId $s.ScopeId -ErrorAction Stop |
+              ForEach-Object {
+                [pscustomobject][ordered]@{
+                    ServerName=$ComputerName
+                    ScopeId=$s.ScopeId
+                    ScopeName=$s.ScopeName
+                    StartRange=$_.StartRange
+                    EndRange=$_.EndRange
+                }
+              }
+        }
+    }
+
+    $dhcpReservations=Invoke-Collector 'DHCP Reservations' {
+        foreach($s in $dhcp){
+            Get-DhcpServerv4Reservation -ComputerName $ComputerName -ScopeId $s.ScopeId -ErrorAction Stop |
+              ForEach-Object {
+                [pscustomobject][ordered]@{
+                    ServerName=$ComputerName
+                    ScopeId=$s.ScopeId
+                    ScopeName=$s.ScopeName
+                    IPAddress=$_.IPAddress
+                    ClientId=$_.ClientId
+                    Name=$_.Name
+                    Description=$_.Description
+                    Type=$_.Type
+                }
+              }
+        }
+    }
+
+    $dhcpOptions=Invoke-Collector 'DHCP Options' {
+        foreach($s in $dhcp){
+            Get-DhcpServerv4OptionValue -ComputerName $ComputerName -ScopeId $s.ScopeId -ErrorAction Stop |
+              ForEach-Object {
+                [pscustomobject][ordered]@{
+                    ServerName=$ComputerName
+                    ScopeId=$s.ScopeId
+                    ScopeName=$s.ScopeName
+                    OptionId=$_.OptionId
+                    Name=$_.Name
+                    Type=$_.Type
+                    Value=(Join-Unique @($_.Value) ', ')
+                    VendorClass=$_.VendorClass
+                    UserClass=$_.UserClass
+                    PolicyName=$_.PolicyName
+                }
+              }
+        }
+    }
+
+    $dhcpFailover=Invoke-Collector 'DHCP Failover' {
+        Get-DhcpServerv4Failover -ComputerName $ComputerName -ErrorAction SilentlyContinue |
+          ForEach-Object {
+            [pscustomobject][ordered]@{
+                ServerName=$ComputerName
+                Name=$_.Name
+                PartnerServer=$_.PartnerServer
+                Mode=$_.Mode
+                State=$_.State
+                ServerRole=$_.ServerRole
+                ScopeId=(Join-Unique @($_.ScopeId))
+                LoadBalancePercent=$_.LoadBalancePercent
+                ReservePercent=$_.ReservePercent
+                MaxClientLeadTime=$_.MaxClientLeadTime
+                AutoStateTransition=$_.AutoStateTransition
+                StateSwitchInterval=$_.StateSwitchInterval
+            }
+          }
+    }
+}else{
+    foreach($collectorName in 'DHCP Scopes','DHCP Exclusions','DHCP Reservations','DHCP Options','DHCP Failover'){
+        Add-Diagnostic $collectorName Success 'Skipped; DHCP role is not installed.'
+    }
+}
 
 $dns=@()
 if($features.Name -contains 'DNS'){
@@ -512,8 +599,8 @@ try {
     foreach ($sheetName in $existingSheetNames) { $book.Worksheets.Delete($sheetName) }
 
     $sys=$system | Select-Object -First 1
-    $installedRoleNames=Join-Unique @($features | Where-Object FeatureType -eq Role | Select-Object -ExpandProperty DisplayName)
-    $installedFeatureNames=Join-Unique @($features | Where-Object FeatureType -ne Role | Select-Object -ExpandProperty DisplayName)
+    $installedRoleCount=@($features | Where-Object FeatureType -eq Role).Count
+    $installedFeatureCount=@($features | Where-Object FeatureType -ne Role).Count
     $ipv4Addresses=Join-Unique $network.IPAddress
     $gateways=Join-Unique $network.Gateway
     $dnsServers=Join-Unique $network.DNS
@@ -551,8 +638,8 @@ try {
         [pscustomobject][ordered]@{Category='Storage';Metric='Volumes';Value=$disks.Count}
         [pscustomobject][ordered]@{Category='Storage';Metric='Total capacity (GB)';Value=$diskTotal}
         [pscustomobject][ordered]@{Category='Storage';Metric='Free capacity (GB)';Value=$diskFree}
-        [pscustomobject][ordered]@{Category='Inventory';Metric='Installed roles';Value=$installedRoleNames}
-        [pscustomobject][ordered]@{Category='Inventory';Metric='Installed features';Value=$installedFeatureNames}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Installed roles';Value=$installedRoleCount}
+        [pscustomobject][ordered]@{Category='Inventory';Metric='Installed features';Value=$installedFeatureCount}
         [pscustomobject][ordered]@{Category='Inventory';Metric='Applications';Value=$applications.Count}
         [pscustomobject][ordered]@{Category='Inventory';Metric='Services';Value=$services.Count}
         [pscustomobject][ordered]@{Category='Inventory';Metric='Listening ports';Value=$ports.Count}
@@ -563,6 +650,10 @@ try {
         [pscustomobject][ordered]@{Category='Directory services';Metric='AD group memberships';Value=$adMembership.Count}
         [pscustomobject][ordered]@{Category='Directory services';Metric='Replication partners';Value=$adReplication.Count}
         [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DHCP scopes';Value=$dhcp.Count}
+        [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DHCP exclusions';Value=$dhcpExclusions.Count}
+        [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DHCP reservations';Value=$dhcpReservations.Count}
+        [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DHCP options';Value=$dhcpOptions.Count}
+        [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DHCP failover relationships';Value=$dhcpFailover.Count}
         [pscustomobject][ordered]@{Category='Infrastructure services';Metric='DNS zones';Value=$dns.Count}
         [pscustomobject][ordered]@{Category='Migration review';Metric='SMB 1.0/CIFS';Value=$(if ($features.Name -contains 'FS-SMB1') { 'Installed' } else { 'Not installed' })}
         [pscustomobject][ordered]@{Category='Migration review';Metric='Service accounts in Windows services';Value=$serviceAccounts.Count}
@@ -607,28 +698,6 @@ try {
         }
     )
 
-    $dhcpRows=@(
-        foreach ($scope in $dhcp) {
-            [pscustomobject][ordered]@{
-                ServerName=$scope.ServerName
-                ScopeName=$scope.ScopeName
-                Status=$scope.Status
-                ScopeId=$scope.ScopeId
-                StartRange=$scope.StartRange
-                EndRange=$scope.EndRange
-                SubnetMask=$scope.SubnetMask
-                AddressPool=$scope.AddressPool
-                Exclusions=$scope.Exclusions
-                Reservations=$scope.Reservations
-                ScopeOptions=(Join-Unique @($scope.ScopeOptions))
-                LeaseDuration=$scope.LeaseDuration
-                Utilization=$scope.Utilization
-                NAP=$scope.NAP
-                Failover=$scope.Failover
-            }
-        }
-    )
-
     $null=Add-DataSheet $book 'System' $system
     $null=Add-DataSheet $book 'Network' $network
     $null=Add-DataSheet $book 'Storage' $disks
@@ -647,7 +716,11 @@ try {
     $null=Add-DataSheet $book 'AD Users' $adUsers
     $null=Add-DataSheet $book 'AD Group Membership' $adMembership
     $null=Add-DataSheet $book 'AD Replication' $adReplication
-    $null=Add-DataSheet $book 'DHCP Scopes' $dhcpRows
+    $null=Add-DataSheet $book 'DHCP Scopes' $dhcp
+    $null=Add-DataSheet $book 'DHCP Exclusions' $dhcpExclusions
+    $null=Add-DataSheet $book 'DHCP Reservations' $dhcpReservations
+    $null=Add-DataSheet $book 'DHCP Options' $dhcpOptions
+    $null=Add-DataSheet $book 'DHCP Failover' $dhcpFailover
     $null=Add-DataSheet $book 'DNS Zones' $dns
     $null=Add-DataSheet $book 'Diagnostics' $script:Diagnostics
 
