@@ -11,8 +11,8 @@ isolated; failures are recorded on the Diagnostics worksheet.
 #>
 [CmdletBinding()]
 param(
-    [string]$TemplatePath = (Join-Path $PSScriptRoot '..\..\TPT - Server Migration Planning Document.xlsx'),
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'Output'),
+    [string]$TemplatePath,
+    [string]$OutputDirectory = 'C:\Temp',
     [switch]$IncludeMicrosoftTasks
 )
 
@@ -97,6 +97,16 @@ if (-not (Get-Module -ListAvailable ImportExcel)) {
     throw 'ImportExcel is required. Install once with: Install-Module ImportExcel -Scope CurrentUser'
 }
 Import-Module ImportExcel -ErrorAction Stop
+if ([string]::IsNullOrWhiteSpace($TemplatePath)) {
+    $templateCandidates = @(
+        (Join-Path $PSScriptRoot 'TPT - Server Migration Planning Document.xlsx'),
+        (Join-Path $PSScriptRoot '..\..\TPT - Server Migration Planning Document.xlsx')
+    )
+    $TemplatePath = $templateCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $TemplatePath) {
+        throw 'Workbook template not found. Place TPT - Server Migration Planning Document.xlsx beside this script or provide -TemplatePath.'
+    }
+}
 $template = Get-Item -LiteralPath $TemplatePath
 if ($template.Extension -ne '.xlsx') { throw 'TemplatePath must be an .xlsx file.' }
 if (-not (Test-Path -LiteralPath $OutputDirectory)) {
