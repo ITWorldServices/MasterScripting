@@ -49,7 +49,7 @@ function Join-Unique {
 
 function Convert-PrefixToMask {
     param([ValidateRange(0,32)][int]$Prefix)
-    $bits = ('1' * $Prefix).PadRight(32,'0')
+    $bits = (('1' * $Prefix) -join '').PadRight(32,'0')
     return ((0,8,16,24 | ForEach-Object {
         [Convert]::ToInt32($bits.Substring($_,8),2)
     }) -join '.')
