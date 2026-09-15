@@ -23,7 +23,8 @@ param(
     [ValidateRange(1,64)][int]$ThrottleLimit=8,
     [ValidateRange(5,300)][int]$ConnectionTimeoutSeconds=30,
     [ValidateRange(30,3600)][int]$OperationTimeoutSeconds=600,
-    [ValidateRange(15,900)][int]$LegacyTimeoutSeconds=60,
+    [Alias('LegacyTimeoutSeconds')]
+    [ValidateRange(15,900)][int]$FallbackTimeoutSeconds=60,
     [pscredential]$Credential,
     [switch]$IncludeMicrosoftTasks,
     [string]$OutputDirectory='C:\Temp'
@@ -199,19 +200,18 @@ $invokeParameters=@{
 if($Credential){$invokeParameters.Credential=$Credential}
 $payloads=@(Invoke-Command @invokeParameters | Where-Object {$_.PSObject.Properties['Metadata'] -and $_.PSObject.Properties['System']})
 
-# Server 2003/2008 may not support the modern PowerShell collector. Retry those
-# systems from the initiating server using WMI/DCOM and return the same payload
-# contract used by the workbook writer.
-$legacyErrors=@{}
-$legacyCandidates=@($adComputers | Where-Object {$_.OperatingSystem -match 'Windows Server (2003|2008)'})
-$legacyJobs=@()
-foreach($computer in $legacyCandidates){
+# Any target can fail the primary WinRM pass because of an older PowerShell
+# version, disabled remoting, or a transient remoting error. Retry every target
+# that did not return a payload through bounded WMI/DCOM basic collection.
+$fallbackErrors=@{}
+$fallbackJobs=@()
+foreach($computer in $adComputers){
     $target=if($computer.DNSHostName){$computer.DNSHostName}else{$computer.Name}
     $existing=$payloads | Where-Object {
         $_.PSComputerName -eq $target -or $_.Metadata.ComputerName -eq $computer.Name
     } | Select-Object -First 1
     if($existing){continue}
-    Write-Host ('Trying legacy WMI/DCOM collection for {0}...' -f $computer.Name) -ForegroundColor Yellow
+    Write-Host ('Trying WMI/DCOM fallback collection for {0}...' -f $computer.Name) -ForegroundColor Yellow
     $job=Start-Job -ScriptBlock {
         param($LegacyCollectorPath,$TargetComputer,$LegacyCredential)
         . $LegacyCollectorPath
@@ -219,37 +219,43 @@ foreach($computer in $legacyCandidates){
         if($LegacyCredential){$parameters.Credential=$LegacyCredential}
         Get-LegacyServerDiscoveryData @parameters
     } -ArgumentList $legacyCollectorPath,$target,$Credential
-    $legacyJobs+=@([pscustomobject]@{
+    $fallbackJobs+=@([pscustomobject]@{
         Job=$job
         Computer=$computer
         Target=$target
     })
 }
 
-if($legacyJobs.Count){
-    $null=Wait-Job -Job @($legacyJobs.Job) -Timeout $LegacyTimeoutSeconds
-    foreach($legacyJob in $legacyJobs){
-        $job=$legacyJob.Job
-        $computer=$legacyJob.Computer
-        $target=$legacyJob.Target
+if($fallbackJobs.Count){
+    $null=Wait-Job -Job @($fallbackJobs.Job) -Timeout $FallbackTimeoutSeconds
+    foreach($fallbackJob in $fallbackJobs){
+        $job=$fallbackJob.Job
+        $computer=$fallbackJob.Computer
+        $target=$fallbackJob.Target
         try{
             if($job.State -eq 'Completed'){
                 $legacyPayload=@(Receive-Job -Job $job -ErrorAction Stop | Where-Object {
                     $_.PSObject.Properties['Metadata'] -and $_.PSObject.Properties['System']
                 }) | Select-Object -First 1
                 if(-not $legacyPayload){throw 'Legacy collection completed without returning an inventory payload.'}
+                $collectionMode=$(if($computer.OperatingSystem -match 'Windows Server (2003|2008)'){'Legacy basic only'}else{'WMI fallback basic only'})
+                $legacyPayload.Metadata.CollectionMode=$collectionMode
+                foreach($systemRow in @($legacyPayload.System)){
+                    $systemRow.CollectionMode=$collectionMode
+                }
                 $legacyPayload | Add-Member NoteProperty PSComputerName $target -Force
                 $payloads+=@($legacyPayload)
+                Add-OrchestratorDiagnostic $computer.Name Warning ('Primary WinRM collection returned no payload; {0} was used.' -f $collectionMode)
             }elseif($job.State -eq 'Failed'){
                 $reason=$job.ChildJobs[0].JobStateInfo.Reason
                 if($reason){throw $reason}
                 throw 'The legacy collection background job failed.'
             }else{
-                throw ('Legacy WMI/DCOM collection exceeded the {0}-second timeout.' -f $LegacyTimeoutSeconds)
+                throw ('WMI/DCOM fallback collection exceeded the {0}-second timeout.' -f $FallbackTimeoutSeconds)
             }
         }catch{
-            $legacyErrors[$target.ToLowerInvariant()]=$_.Exception.Message
-            $legacyErrors[$computer.Name.ToLowerInvariant()]=$_.Exception.Message
+            $fallbackErrors[$target.ToLowerInvariant()]=$_.Exception.Message
+            $fallbackErrors[$computer.Name.ToLowerInvariant()]=$_.Exception.Message
         }finally{
             if($job.State -notin 'Completed','Failed','Stopped'){
                 Stop-Job -Job $job -ErrorAction SilentlyContinue
@@ -296,8 +302,8 @@ foreach($computer in $adComputers){
     }else{
         $inventoryStatus='Unavailable'
         $errorMessage=Join-UniqueValue @(
-            $legacyErrors[$key]
-            $legacyErrors[$computer.Name.ToLowerInvariant()]
+            $fallbackErrors[$key]
+            $fallbackErrors[$computer.Name.ToLowerInvariant()]
             $errorByTarget[$key]
             $errorByTarget[$computer.Name.ToLowerInvariant()]
         )
@@ -366,12 +372,12 @@ try{
 }
 
 $unavailable=@($serverSummary | Where-Object InventoryStatus -eq Unavailable).Count
-$legacyCompleted=@($serverSummary | Where-Object CollectionMode -eq 'Legacy basic only').Count
+$fallbackCompleted=@($serverSummary | Where-Object CollectionMode -match '^(Legacy|WMI fallback) basic only$').Count
 $collectorFailures=@($diagnostics | Where-Object Status -eq Failed).Count
 Write-Host ''
 Write-Host 'AD-wide server discovery completed.' -ForegroundColor Green
 Write-Host ('Servers targeted: {0}' -f $serverSummary.Count)
-Write-Host ('Servers collected through legacy WMI: {0}' -f $legacyCompleted)
+Write-Host ('Servers collected through WMI/DCOM fallback: {0}' -f $fallbackCompleted)
 Write-Host ('Servers unavailable: {0}' -f $unavailable)
 Write-Host ('Collector failures: {0}' -f $collectorFailures)
 Write-Host ('Output: {0}' -f $outputPath)
