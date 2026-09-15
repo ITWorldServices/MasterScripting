@@ -638,5 +638,7 @@ if($basicOnly){
     DHCPOptions=@($dhcpOptions)
     DHCPFailover=@($dhcpFailover)
     DNSZones=@($dnsZones)
-    Diagnostics=@($script:Diagnostics)
+    # New-Object keeps this collector compatible with PowerShell 4.0. Use
+    # ToArray(): @($list) can throw on its wrapped List[object] in PowerShell 5+.
+    Diagnostics=$script:Diagnostics.ToArray()
 }
