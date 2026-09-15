@@ -5,6 +5,13 @@ objects from Active Directory and produces one consolidated workbook in
 `C:\Temp`. It does not change or replace the single-server
 `Invoke-ServerDiscovery.ps1` workflow.
 
+For an individual server that cannot be reached remotely, or a workgroup server
+with a different administrator account, copy and run
+[`Invoke-StandaloneServerDiscovery.ps1`](Invoke-StandaloneServerDiscovery.ps1)
+on that server. It is self-contained and writes its workbook to `C:\Temp`.
+See [standalone instructions](README-StandaloneServerDiscovery.md), including
+the local legacy path for Windows Server 2008 R2.
+
 ## Files to download
 
 Keep these three files together in the same directory:
