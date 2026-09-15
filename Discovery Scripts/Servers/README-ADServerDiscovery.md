@@ -11,7 +11,7 @@ Keep these three files together in the same directory:
 
 - `Invoke-ADServerDiscovery.ps1` — AD enumeration, remoting, consolidation, and Excel output
 - `Get-ServerDiscoveryData.ps1` — data-only collector executed through PowerShell remoting
-- `Get-LegacyServerDiscoveryData.ps1` — WMI/DCOM fallback for Server 2003/2008
+- `Get-LegacyServerDiscoveryData.ps1` — bounded WMI/DCOM basic-inventory fallback
 
 The collector is sent by `Invoke-Command -FilePath`; it does not need to be
 copied to each remote server. Remote servers do not need ImportExcel and do not
@@ -22,7 +22,7 @@ connect to GitHub. Only the initiating server creates the workbook.
 - Windows PowerShell 5.1
 - ActiveDirectory PowerShell module on the initiating server
 - PowerShell remoting/WinRM allowed from the initiating server to targets
-- WMI/DCOM and RPC firewall access to legacy Server 2003/2008 targets
+- WMI/DCOM and RPC firewall access to any target that may require fallback collection
 - An account with permission to query AD and inventory each target
 - HTTPS access to PowerShell Gallery/NuGet on the initiating server if
   ImportExcel 7.8.10 is not already installed
@@ -55,8 +55,8 @@ Useful options:
 $credential=Get-Credential
 .\Invoke-ADServerDiscovery.ps1 -Credential $credential -ThrottleLimit 12
 
-# Allow up to 90 seconds for legacy WMI collection
-.\Invoke-ADServerDiscovery.ps1 -LegacyTimeoutSeconds 90
+# Allow up to 90 seconds for the WMI/DCOM fallback phase
+.\Invoke-ADServerDiscovery.ps1 -FallbackTimeoutSeconds 90
 ```
 
 ## Collection rules
@@ -93,25 +93,30 @@ General servers run role-specific collectors only when the role is installed:
 AD users and group memberships are de-duplicated in the consolidated workbook
 when multiple domain controllers return the same domain data.
 
-## Legacy Windows Servers
+## WMI/DCOM fallback
 
-If a Windows Server 2003 or 2008 target does not return a modern PowerShell
-payload, the orchestrator retries it over WMI/DCOM from the initiating server.
-The legacy path collects system, network, storage, server features,
-applications, services, shares, scheduled tasks, local accounts, local group
-membership, and service accounts where the operating system exposes them.
+If any target does not return a modern PowerShell payload, the orchestrator
+retries it over WMI/DCOM from the initiating server. This covers legacy Windows
+Server versions as well as newer systems where WinRM is disabled, incompatible,
+or temporarily unavailable. A successful fallback restores the server's basic
+rows instead of leaving it absent from the detail sheets.
 
-Legacy collection is identified as `Legacy basic only` on `Server Summary`.
+The fallback collects system, network, storage, server features, applications,
+services, shares, scheduled tasks, local accounts, local group membership, and
+service accounts where the operating system exposes them. Legacy operating
+systems are identified as `Legacy basic only`; newer systems are identified as
+`WMI fallback basic only` on `Server Summary`.
+
 Listening ports and expanded share/NTFS permissions are not reliably available
-through the legacy interfaces and are recorded as skipped or limited in
-`Diagnostics`. Role-specific AD, DHCP, and DNS discovery remains on the modern
-collector.
+through WMI/DCOM and are recorded as skipped or limited in `Diagnostics`.
+Role-specific AD, DHCP, and DNS discovery remains on the modern collector.
 
-Legacy attempts run as background jobs in parallel. The default 60-second
-timeout applies to the complete legacy collection phase, not to each individual
-WMI query. A target that exceeds the timeout is stopped, marked unavailable,
-and does not prevent the workbook from being created. Use
-`-LegacyTimeoutSeconds` to adjust the limit between 15 and 900 seconds.
+Fallback attempts run as background jobs in parallel. The default 60-second
+timeout applies to the complete fallback phase, not to each individual WMI
+query. A target that exceeds the timeout is stopped, marked unavailable, and
+does not prevent the workbook from being created. Use
+`-FallbackTimeoutSeconds` to adjust the limit between 15 and 900 seconds.
+`-LegacyTimeoutSeconds` remains accepted as a compatibility alias.
 
 ## Failures and unavailable servers
 
