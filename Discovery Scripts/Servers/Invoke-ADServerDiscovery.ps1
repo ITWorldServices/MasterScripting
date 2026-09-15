@@ -200,6 +200,30 @@ $invokeParameters=@{
 if($Credential){$invokeParameters.Credential=$Credential}
 $payloads=@(Invoke-Command @invokeParameters | Where-Object {$_.PSObject.Properties['Metadata'] -and $_.PSObject.Properties['System']})
 
+# Retain primary errors even when WMI fallback later returns a payload. Include
+# the error ID and source location so a collector bug is distinguishable from
+# an offline server without having to open the workbook.
+$errorByTarget=@{}
+foreach($remoteError in @($remoteErrors)){
+    $errorTarget=[string]$remoteError.OriginInfo.PSComputerName
+    if([string]::IsNullOrWhiteSpace($errorTarget)){$errorTarget=[string]$remoteError.CategoryInfo.TargetName}
+    if([string]::IsNullOrWhiteSpace($errorTarget)){$errorTarget='Unknown'}
+    $errorDetail=Join-UniqueValue @(
+        [string]$remoteError.Exception.Message
+        [string]$remoteError.FullyQualifiedErrorId
+        [string]$remoteError.InvocationInfo.PositionMessage
+        [string]$remoteError.ScriptStackTrace
+    )
+    $errorKeys=@($errorTarget.ToLowerInvariant())
+    if($errorTarget.Contains('.')){$errorKeys+=@($errorTarget.Split('.')[0].ToLowerInvariant())}
+    foreach($errorKey in $errorKeys){
+        $existingMessage=$errorByTarget[$errorKey]
+        $errorByTarget[$errorKey]=Join-UniqueValue @($existingMessage,$errorDetail)
+    }
+    Add-OrchestratorDiagnostic $errorTarget Warning ('Primary WinRM collection: {0}' -f $errorDetail)
+    Write-Warning ('Primary WinRM collection on {0}: {1}' -f $errorTarget,$errorDetail)
+}
+
 # Any target can fail the primary WinRM pass because of an older PowerShell
 # version, disabled remoting, or a transient remoting error. Retry every target
 # that did not return a payload through bounded WMI/DCOM basic collection.
@@ -256,6 +280,7 @@ if($fallbackJobs.Count){
         }catch{
             $fallbackErrors[$target.ToLowerInvariant()]=$_.Exception.Message
             $fallbackErrors[$computer.Name.ToLowerInvariant()]=$_.Exception.Message
+            Write-Warning ('WMI/DCOM fallback on {0}: {1}' -f $computer.Name,$_.Exception.Message)
         }finally{
             if($job.State -notin 'Completed','Failed','Stopped'){
                 Stop-Job -Job $job -ErrorAction SilentlyContinue
@@ -270,18 +295,6 @@ foreach($payload in $payloads){
     $key=[string]$payload.PSComputerName
     if([string]::IsNullOrWhiteSpace($key)){$key=[string]$payload.Metadata.ComputerName}
     if($key){$payloadByTarget[$key.ToLowerInvariant()]=$payload}
-}
-$errorByTarget=@{}
-foreach($remoteError in @($remoteErrors)){
-    $errorTarget=[string]$remoteError.OriginInfo.PSComputerName
-    if([string]::IsNullOrWhiteSpace($errorTarget)){$errorTarget=[string]$remoteError.CategoryInfo.TargetName}
-    if([string]::IsNullOrWhiteSpace($errorTarget)){$errorTarget='Unknown'}
-    $errorKeys=@($errorTarget.ToLowerInvariant())
-    if($errorTarget.Contains('.')){$errorKeys+=@($errorTarget.Split('.')[0].ToLowerInvariant())}
-    foreach($errorKey in $errorKeys){
-        $existingMessage=$errorByTarget[$errorKey]
-        $errorByTarget[$errorKey]=Join-UniqueValue @($existingMessage,[string]$remoteError.Exception.Message)
-    }
 }
 
 $serverSummary=@()
@@ -329,7 +342,7 @@ foreach($computer in $adComputers){
 
 $adUsers=@(Get-PayloadRows $payloads ADUsers | Sort-Object Domain,DistinguishedName -Unique)
 $adMembership=@(Get-PayloadRows $payloads ADGroupMembership | Sort-Object Domain,Username,GroupName,MembershipType -Unique)
-$diagnostics=@($script:Diagnostics)+@(Get-PayloadRows $payloads Diagnostics)
+$diagnostics=$script:Diagnostics.ToArray()+@(Get-PayloadRows $payloads Diagnostics)
 
 $domain=try{Get-ADDomain}catch{$null}
 $prefix=if($domain){$domain.NetBIOSName}else{'AD'}

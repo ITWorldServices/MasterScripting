@@ -124,3 +124,23 @@ An offline, inaccessible, or remoting-disabled server does not stop the run.
 Every AD target appears on `Server Summary`; its status and error are recorded
 there and on `Diagnostics`. Collector-level failures are also retained, while
 successful data from the rest of the environment is still exported.
+
+Primary WinRM and fallback errors are also printed in the console. Primary
+errors retain the error ID and available source location in `Diagnostics`,
+including when WMI fallback subsequently succeeds.
+
+## Updating the collectors
+
+Download all three `.ps1` files listed above together when applying a fix.
+The diagnostics-array fix changes both `Get-ServerDiscoveryData.ps1` and
+`Get-LegacyServerDiscoveryData.ps1`; replacing only the orchestrator does not
+apply it. Both collectors now convert their diagnostics lists with `ToArray()`
+to prevent an array-conversion error from discarding an otherwise collected
+inventory. The remote collector still supports PowerShell 4.0.
+
+The payload regression check uses synthetic data and makes no AD, WinRM, WMI,
+or Excel calls. From the repository's server-discovery directory, run:
+
+```powershell
+.\Tests\Test-DiscoveryPayload.ps1
+```

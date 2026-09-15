@@ -304,6 +304,7 @@ function Get-LegacyServerDiscoveryData {
         DHCPOptions=@()
         DHCPFailover=@()
         DNSZones=@()
-        Diagnostics=@($diagnostics)
+        # Avoid the PowerShell array-subexpression bug for New-Object List[object].
+        Diagnostics=$diagnostics.ToArray()
     }
 }
